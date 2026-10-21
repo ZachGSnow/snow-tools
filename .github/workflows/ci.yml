@@ -18,6 +18,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      # The secret scan skips the files the app writes into data/ (see .gitleaks.toml), so make
+      # sure none of them can be committed: that folder is the user's private runtime data.
+      - name: No runtime data is tracked
+        shell: pwsh
+        run: |
+          $tracked = @(git ls-files data)
+          if ($tracked.Count -gt 0) {
+            Write-Host "Files under data/ are tracked (runtime data must never be committed):"
+            $tracked | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+          Write-Host "No files under data/ are tracked."
       - name: Install AutoHotkey v2 (portable, pinned to the tested version)
         shell: pwsh
         env:
