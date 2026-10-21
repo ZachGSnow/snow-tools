@@ -109,9 +109,13 @@ The defaults the first run seeds (`zem`, `zph`, `:ty`, `cdate`, `tdate`, `ctime`
 ## Testing
 
 ```powershell
-pwsh -File tests\run-tests.ps1                 # syntax check + self-test (about 40 s)
+pwsh -File tests\run-tests.ps1                 # syntax check + self-test (about a minute)
+pwsh -File tests\run-tests.ps1 -StopLive       # same, stopping a running Snow Tools for the run
 pwsh -File tests\run-tests.ps1 -Showcase       # regenerate the screenshots in docs\
+pwsh -File tests\test-live-guard.ps1           # check the running-instance guard (seconds)
 ```
+
+**If you use Snow Tools from the folder you develop in:** the tests send real key presses and use the real clipboard, so a running Snow Tools would react to them and record the test clips in your real history. The runner therefore refuses to start while one is running and tells you so. Exit it from its tray menu, or pass `-StopLive`: it exits the running app cleanly, runs, and starts it again from the same script afterwards, even when the run fails. `tests\test-live-guard.ps1` checks that behavior with a stand-in script, never your real app, and runs in CI. Settings exports (`snowtools-settings*.txt`) are git-ignored for the same reason: they hold your private snippets.
 
 The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard and its setting (a flagged copy is skipped, recorded when the guard is off, pause works), the settings and delete actions (both confirmations are answered for real: declining keeps the data, and the wrong word deletes nothing), hotkey rebinding (the rules, real key presses firing a rebound hotkey and not the old one, key capture, swaps, saved choices at start, reset), settings export and import (strict parsing, the summary dialog, merge and replace, the backup, and the privacy opt-in), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
 
