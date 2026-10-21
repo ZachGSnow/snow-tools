@@ -91,19 +91,28 @@ SnippetsLoad() {
         FileAppend(SnipDefaultFile(), SnipPath, "UTF-8")
     }
     for line in StrSplit(FileRead(SnipPath, "UTF-8"), "`n", "`r") {
-        line := LTrim(line)
-        if (line = "" || SubStr(line, 1, 1) = "#")
-            continue
-        eq := InStr(line, "=")
-        if (eq < 2)
-            continue
-        trig := Trim(SubStr(line, 1, eq - 1))
-        txt := SubStr(line, eq + 1)
-        if (SubStr(txt, 1, 1) = " ")
-            txt := SubStr(txt, 2)
-        if SnipValidTrigger(trig)
-            Snippets.Push({trigger: trig, text: SnipDecode(txt)})
+        sn := SnipParseLine(line)
+        if (sn != "")
+            Snippets.Push(sn)
     }
+}
+
+; One "trigger = text" line (text still in file encoding) -> {trigger, text}, or "" for a
+; blank line, a comment or a line that is not a valid snippet.
+SnipParseLine(line) {
+    line := LTrim(line)
+    if (line = "" || SubStr(line, 1, 1) = "#")
+        return ""
+    eq := InStr(line, "=")
+    if (eq < 2)
+        return ""
+    trig := Trim(SubStr(line, 1, eq - 1))
+    txt := SubStr(line, eq + 1)
+    if (SubStr(txt, 1, 1) = " ")
+        txt := SubStr(txt, 2)
+    if !SnipValidTrigger(trig)
+        return ""
+    return {trigger: trig, text: SnipDecode(txt)}
 }
 
 SnippetsSave() {

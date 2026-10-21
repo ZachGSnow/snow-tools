@@ -21,7 +21,7 @@ RegHotkey("^!s", "Settings: clipboard options, delete data", SettingsToggle)
 ; ---------------------------------------------------------------------------
 SettingsBuild() {
     global SettingsWin, SettingsSensNote, SettingsDataInfo
-    w := SnowWin("SETTINGS", 84, 23)
+    w := SnowWin("SETTINGS", 84, 25)
     SettingsWin := w
     w.Put(2, 1, "CLIPBOARD", THEME_ACCENT)
     SettingsAddCheck(w, 3, "Skip copies flagged by password managers", () => SnowPrefBool("clips.skipsensitive"), SettingsSetSensitive)
@@ -39,8 +39,12 @@ SettingsBuild() {
     w.Put(30, 16, "clips, images, pad, sticky notes and the log", THEME_FG_DIM)
     w.Btn(2, 17, "[reset settings]", SettingsReset)
     w.Put(30, 17, "preferences and snippets back to the defaults", THEME_FG_DIM)
-    w.Btn(2, 18, "[open data folder]", (*) => SnowOpenDataFolder())
-    w.Put(2, 20, "Deleting is a normal file delete, not a secure erase.", THEME_FG_DIM)
+    w.Btn(2, 18, "[export settings...]", SettingsExportClick)
+    w.Put(30, 18, "preferences and snippets to a text file", THEME_FG_DIM)
+    w.Btn(2, 19, "[import settings...]", SettingsImportClick)
+    w.Put(30, 19, "from an export; shows what changes first", THEME_FG_DIM)
+    w.Btn(2, 20, "[open data folder]", (*) => SnowOpenDataFolder())
+    w.Put(2, 22, "Deleting is a normal file delete, not a secure erase.", THEME_FG_DIM)
     w.SetStatus("esc closes")
 }
 
@@ -142,6 +146,25 @@ SettingsAfterDelete(message) {
         ClipRefresh()
     SettingsRefresh()
     ClipToast(message)
+}
+
+; Export and import go through the file dialogs; the work is in features\transfer.ahk.
+SettingsExportClick(*) {
+    path := FileSelect("S16", A_MyDocuments "\snowtools-settings.txt", "Export settings", "Text files (*.txt)")
+    if (path = "")
+        return
+    try {
+        TransferExportFile(path)
+        ClipToast("Settings exported")
+    } catch as err {
+        TransferError("Could not write the file: " err.Message)
+    }
+}
+
+SettingsImportClick(*) {
+    path := FileSelect(3, A_MyDocuments, "Import settings", "Text files (*.txt)")
+    if (path != "")
+        TransferImportStart(path)
 }
 
 SettingsReset(*) {

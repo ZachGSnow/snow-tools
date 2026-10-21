@@ -9,6 +9,15 @@ global SnowPrefDefaults := Map(
     "clips.autodecimal", "1",       ; START/END time blocks become decimal hours
     "clips.skipsensitive", "1"      ; never record copies flagged by password managers
 )
+global SnowPrefLabels := Map(
+    "clips.autodecimal", "START/END to hours",
+    "clips.skipsensitive", "Password-manager guard"
+)
+; The value of a preference that lowers your privacy. An import never applies these unless
+; the person importing says so.
+global SnowPrefRisky := Map(
+    "clips.skipsensitive", "0"
+)
 
 SnowPrefGet(name) {
     global SnowPrefDefaults, SnowPrefCache, SnowPrefsPath
