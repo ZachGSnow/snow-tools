@@ -19,7 +19,7 @@ Service desk work is a stream of small repeats: paste the same wording into anot
 | Ctrl+Alt+V | Snow Clips | Clipboard history: 10,000 text clips and 200 images, search, text and image preview, pin, delete, paste |
 | Ctrl+Alt+P | Pause | Stops and resumes clipboard recording |
 | Alt+S | Snippets | Add, edit and delete text expansions in an editor; changes apply immediately, no reload |
-| Ctrl+Alt+S | Settings | Clipboard options (password guard, time-block conversion, pause) and the buttons that delete your data |
+| Ctrl+Alt+S | Settings | Clipboard options (password guard, time-block conversion, pause), the buttons that delete your data, and settings export and import |
 | Win+N | Snow Pad | One scratch note that autosaves every 5 seconds; Ctrl+F finds |
 | Alt+N | Sticky notes | As many small notes as you like, each remembering its place and size |
 | Alt+C | Snow Calc | `1100-1115` gives 0.25 hours, `9:30-17:05` gives 7.58, and plain arithmetic works too |
@@ -61,11 +61,20 @@ A clipboard history is sensitive by nature, so:
 
 ![The delete-all confirmation](docs/delete-confirm.png)
 
+## Moving your settings
+
+Settings has **export settings** and **import settings** buttons. An export is one plain-text file with your preferences and snippets (clips and notes are data, not settings, and are never exported). It is meant to be read: open it in any editor. Because snippets can contain private text, look at an export before you share it.
+
+Importing is treated as untrusted input. The file is parsed strictly (known preferences only, valid triggers only, a 1 MB limit) and nothing changes until you have seen a summary of what would: preferences that change, how many snippets are new, changed or identical, and anything that was skipped. You then choose **merge** (add new snippets, update changed ones, keep the rest) or **replace** (your snippets become exactly the file's; refused if the file has none). Your current settings are saved to `data\backup\` first (the newest 10 are kept), and everything applies immediately. A file that would turn the password-manager guard off does not do so unless you tick a separate, red opt-in line in the dialog.
+
+![The import dialog showing what would change](docs/import-settings.png)
+
 ## Configuration
 
 | Setting | Where |
 |---|---|
 | Snippets | Alt+S, or edit `data\snippets.txt` and choose Reload from the tray menu |
+| Move or back up settings | Export and import in Ctrl+Alt+S (see above); automatic backups in `data\backup\` |
 | Password-manager guard, START/END to hours, pause | Ctrl+Alt+S (also in the HUD and the tray menu). Preferences are saved in `data\prefs.ini`; Ctrl+T in the clips window also toggles START/END |
 | Clip limits | `CLIP_MAX_TEXT`, `CLIP_MAX_IMG`, `CLIP_MAX_CHARS` at the top of `lib\clipstore.ahk` |
 | Colors and font | The `THEME_*` constants at the top of `lib\theme.ahk` |
@@ -87,7 +96,7 @@ pwsh -File tests\run-tests.ps1                 # syntax check + self-test (about
 pwsh -File tests\run-tests.ps1 -Showcase       # regenerate the screenshots in docs\
 ```
 
-The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard and its setting (a flagged copy is skipped, recorded when the guard is off, pause works), the settings and delete actions (both confirmations are answered for real: declining keeps the data, and the wrong word deletes nothing), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
+The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard and its setting (a flagged copy is skipped, recorded when the guard is off, pause works), the settings and delete actions (both confirmations are answered for real: declining keeps the data, and the wrong word deletes nothing), settings export and import (strict parsing, the summary dialog, merge and replace, the backup, and the privacy opt-in), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
 
 Verified: Windows 11 with AutoHotkey 2.0.28. Not verified: Windows 10, mixed-DPI multi-monitor setups, and non-US keyboard layouts (hotstrings and `Send` can behave differently there).
 

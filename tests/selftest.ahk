@@ -506,6 +506,124 @@ GroupReset() {
     TypeEnd()
 }
 
+Group("transfer: export and parse", GroupTransferParse)
+GroupTransferParse() {
+    text := TransferExportText()
+    Check("an export has the header, preferences and snippets", InStr(text, "format = 1") && InStr(text, "[prefs]")
+        && InStr(text, "clips.skipsensitive = 1") && InStr(text, "[snippets]") && InStr(text, "zem = you@example.com"))
+    p := TransferParse(text)
+    Check("an export parses back to the same snippets and preferences", p.ok && p.snippets.Length = Snippets.Length
+        && p.prefs["clips.skipsensitive"] = "1" && p.ignored.Length = 0 && p.snippets[7].text == Snippets[7].text, p.error)
+    Check("CRLF line endings parse the same", TransferParse(StrReplace(text, "`n", "`r`n")).snippets.Length = Snippets.Length)
+    Check("an empty file is rejected", !TransferParse("").ok)
+    Check("plain text without a format line is rejected", !TransferParse("hello world`n[snippets]`nzz = x`n").ok)
+    n := TransferParse("format = 2`n[prefs]`n")
+    Check("a newer format is rejected with a clear message", !n.ok && InStr(n.error, "newer"), n.error)
+    Check("an oversized file is rejected", !TransferParse(SnowRepeat("x", 1048577)).ok)
+    odd := "format = 1`n[prefs]`nclips.skipsensitive = 0`nbogus.pref = 1`nclips.autodecimal = maybe`n"
+        . "[snippets]`nok1 = hello`nbad trigger = x`nok1 = dup`nline without equals`n[hotkeys]`nfoo = bar`n"
+    q := TransferParse(odd)
+    Check("unknown or invalid entries are skipped and listed", q.ok && q.prefs.Count = 1 && q.prefs["clips.skipsensitive"] = "0"
+        && q.snippets.Length = 1 && q.snippets[1].text = "hello" && q.ignored.Length = 6, q.ignored.Length)
+    Check("parsing changes nothing", Snippets.Length = 7 && SnowPrefGet("clips.skipsensitive") = "1")
+}
+
+Group("transfer: plan and apply", GroupTransferApply)
+GroupTransferApply() {
+    file := "format = 1`n[prefs]`nclips.autodecimal = 0`nclips.skipsensitive = 0`n"
+        . "[snippets]`nzem = new@example.com`nzph = 555-0100`nzimp = imported {date}`n"
+    plan := TransferPlan(TransferParse(file))
+    risky := 0
+    for pr in plan.prefs
+        if pr.risky
+            risky++
+    Check("the plan counts new, changed and identical snippets", plan.added = 1 && plan.changed = 1 && plan.same = 1 && plan.removed = 5
+        , plan.added "," plan.changed "," plan.same "," plan.removed)
+    Check("only the privacy-lowering preference is flagged risky", plan.prefs.Length = 2 && risky = 1)
+
+    r := TransferApply(plan, "merge", false)
+    Check("merge applies the safe preference and holds back the risky one", r.ok && !ClipAutoDecimal
+        && SnowPrefGet("clips.skipsensitive") = "1" && InStr(r.message, "skipped"), r.message)
+    Check("merge adds and updates snippets and keeps the rest", Snippets.Length = 8 && Snippets[1].text = "new@example.com"
+        && FileRead(SnipPath, "UTF-8") ~= "callnote" && InStr(FileRead(SnipPath, "UTF-8"), "zimp = imported {date}"))
+    SendLevel(1)
+    TypeBegin()
+    Check("imported snippets expand without a reload", TypeIn("zimp") = "imported " FormatTime(, "yyyy-MM-dd") && TypeIn("zem") = "new@example.com")
+    TypeEnd()
+    backups := []
+    Loop Files TransferBackupDir "\settings-*.txt"
+        backups.Push(A_LoopFileFullPath)
+    Check("a backup of the old settings was written first", backups.Length >= 1
+        && InStr(FileRead(backups[backups.Length], "UTF-8"), "zem = you@example.com"), backups.Length)
+
+    plan := TransferPlan(TransferParse(file))
+    r := TransferApply(plan, "replace", true)
+    Check("replace makes the snippets exactly the file's", r.ok && Snippets.Length = 3 && !(FileRead(SnipPath, "UTF-8") ~= "callnote"), Snippets.Length)
+    Check("an allowed risky preference is applied", SnowPrefGet("clips.skipsensitive") = "0")
+    SendLevel(1)
+    TypeBegin()
+    Check("a snippet that was replaced away no longer expands", TypeIn("callnote") = "callnote")
+    TypeEnd()
+    empty := TransferPlan(TransferParse("format = 1`n[snippets]`n"))
+    r := TransferApply(empty, "replace", false)
+    Check("replacing with a file that has no snippets is refused", !r.ok && Snippets.Length = 3, r.message)
+
+    ClipSetAutoDecimal(true)
+    SnowPrefSet("clips.skipsensitive", "1")
+    Loop 12
+        TransferBackup()
+    n := 0
+    Loop Files TransferBackupDir "\settings-*.txt"
+        n++
+    Check("only the newest 10 backups are kept", n = 10, n)
+}
+
+Group("transfer: files and dialog", GroupTransferDialog)
+GroupTransferDialog() {
+    SnowPrefsReset()
+    ClipApplyPrefs()
+    SnippetsResetToDefaults()
+    path := TestShots "\export-test.txt"
+    TransferExportFile(path)
+    Check("export writes a file that parses", TransferParse(FileRead(path, "UTF-8")).ok)
+
+    Snippets[1].text := "changed@example.com"
+    SnippetsSave()
+    SnippetsApply()
+    ClipSetAutoDecimal(false)
+    TransferImportStart(path)
+    Check("the import dialog opens", TransferWin.IsVisible())
+    Check("it summarizes what would change", InStr(TransferInfo.Value, "START/END to hours: off -> on")
+        && InStr(TransferInfo.Value, "1 changed"), TransferInfo.Value)
+    Snap(TransferWin, "import")
+    TransferWin.Hide()
+    Check("cancelling changes nothing", Snippets[1].text = "changed@example.com" && !ClipAutoDecimal)
+    TransferImportStart(path)
+    TransferChoose("replace")
+    Check("importing the export restores the settings", Snippets[1].text = "you@example.com" && ClipAutoDecimal && !TransferWin.IsVisible())
+
+    bad := TestShots "\not-settings.txt"
+    FileOpen(bad, "w").Write("just some notes`nnothing to see")
+    TestAnswer("Button1")
+    TransferImportStart(bad)
+    Check("a file that is not a settings export is refused and nothing opens", !TransferWin.IsVisible() && Snippets.Length = 7)
+    TestAnswer("Button1")
+    TransferImportStart(TestShots "\does-not-exist.txt")
+    Check("a missing file is reported, not a crash", !TransferWin.IsVisible())
+
+    guardOff := TestShots "\guard-off.txt"
+    FileOpen(guardOff, "w").Write("format = 1`n[prefs]`nclips.skipsensitive = 0`n")
+    TransferImportStart(guardOff)
+    Check("a file that lowers privacy shows the opt-in line", TransferRiskyBtn.Visible && InStr(TransferInfo.Value, "Password-manager guard: on -> OFF"))
+    TransferChoose("merge")
+    Check("by default the risky setting is not applied", SnowPrefGet("clips.skipsensitive") = "1")
+    TransferImportStart(guardOff)
+    TransferToggleRisky()
+    TransferChoose("merge")
+    Check("it is applied only after the opt-in is ticked", SnowPrefGet("clips.skipsensitive") = "0")
+    SnowPrefSet("clips.skipsensitive", "1")
+}
+
 ; --------------------------------------------------------------------------
 if (TestSavedClip != "")
     try A_Clipboard := TestSavedClip

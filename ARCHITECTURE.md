@@ -44,6 +44,17 @@ Capture is `OnClipboardChange` in `features/clipboard.ahk`. Before anything is r
 
 `features/settings.ahk` is the window. Checkbox rows are clickable text (`[x]` / `[ ]`) with a getter and a setter, and `SettingsRefresh` redraws them all from the getters, so the window cannot disagree with the real state. The delete actions live next to the data they remove: `ClipClearAll` in the clip store, `NotesClearAll` in the notes feature, and `SnippetsResetToDefaults` in snippets. The window only orchestrates them and asks for confirmation. Clearing history uses a Yes/No box that defaults to No; deleting everything opens a dialog that proceeds only when the text is exactly `DELETE`. Both are plain file deletes, not secure erases. The self-test answers the real dialogs by clicking their buttons, so it covers both the decline and the accept paths.
 
+## Export and import
+
+`features/transfer.ahk` moves preferences and snippets as one text file: a `format = N` header, a `[prefs]` section (`section.key = 0|1`) and a `[snippets]` section in the same encoding as `snippets.txt` (the line parser, `SnipParseLine`, is shared with the loader). The work is split into small steps so each can be tested alone:
+
+1. **`TransferParse(text)`** is pure. It reads the text and returns what it understood plus a list of what it skipped, and never touches the live state. Unknown preferences, values other than 0 or 1, invalid or duplicate triggers, oversized snippets, unknown sections, files over 1 MB and a `format` newer than this version are all handled there, so a hostile or hand-edited file cannot do more than be rejected or partly ignored.
+2. **`TransferPlan(parsed)`** compares the parse with the current state: which preferences would change, how many snippets are new, changed or identical, how many of yours a replace would drop. A preference whose new value lowers privacy (`SnowPrefRisky` in `lib/settings.ahk`) is flagged.
+3. **The dialog** shows the plan and does nothing until a button is pressed.
+4. **`TransferApply(plan, mode, allowRisky)`** writes a backup of the current state to `data\backup\` first (newest 10 kept), then applies preferences and snippets and re-registers the hotstrings, so everything takes effect without a reload. Flagged preferences are held back unless `allowRisky` is true, which only the dialog's separate opt-in sets; replace is refused when the file has no snippets.
+
+New preferences need an entry in `SnowPrefDefaults` and a label in `SnowPrefLabels`; export and import pick them up from there.
+
 ## Snippets
 
 `data\snippets.txt` is parsed into `Snippets`, and each entry becomes a hotstring (`Hotstring()` at runtime). Plain text uses the native replacement; text with a newline or a token goes through `SnipExpand`, which fills the tokens, sends the text with `SendText`, and moves the caret back to `{cursor}`. Re-applying turns off hotstrings that are gone or changed, so edits take effect without a reload. Conflict checks (shadowing, duplicates, reserved triggers in `SnipReserved`) run as you type in the editor.

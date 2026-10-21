@@ -91,6 +91,16 @@ SettingsWipeDialog()
 Snap(WipeWin, "delete-confirm")
 WipeWin.Hide()
 
+; --- import dialog: a made-up export from a colleague
+sample := A_ScriptDir "\colleague-settings.txt"
+FileOpen(sample, "w", "UTF-8").Write("# Snow Tools settings`nformat = 1`n[prefs]`nclips.autodecimal = 0`nclips.skipsensitive = 1`n"
+    . "[snippets]`nzem = jordan.lee@contoso.com`nzph = 555-0100`nsignoff = Thanks,\nJordan Lee\nContoso Service Desk`n"
+    . "zip = 192.0.2.14`n")
+TransferImportStart(sample)
+Snap(TransferWin, "import-settings")
+TransferWin.Hide()
+FileDelete(sample)
+
 ; --- calculator
 CalcToggle()
 CalcInput.Value := "9:30-17:05"
