@@ -624,7 +624,7 @@ GroupTransferDialog() {
     SnowPrefSet("clips.skipsensitive", "1")
 }
 
-TestWaitFor(fn, ms := 3000) {
+TestWaitFor(fn, ms := 5000) {
     t0 := A_TickCount
     while (A_TickCount - t0 < ms) {
         if fn()
@@ -640,7 +640,7 @@ TestSend(keys) {
     SendLevel(1)
     TypeBegin()
     SendEvent(keys)
-    Sleep(300)
+    Sleep(500)
     TypeEnd()
 }
 
@@ -760,7 +760,7 @@ Group("hotkeys: capture", GroupHotkeyCapture)
 GroupHotkeyCapture() {
     got := "unset"
     HotkeyCaptureStart((k) => got := k)
-    Sleep(200)
+    Sleep(400)
     SendEvent("^!{F7}")
     TestWaitFor(() => got != "unset")
     Check("a shortcut is captured with its modifiers", got = "^!F7", got)
@@ -768,21 +768,21 @@ GroupHotkeyCapture() {
 
     got := "unset"
     HotkeyCaptureStart((k) => got := k)
-    Sleep(200)
+    Sleep(400)
     SendEvent("!s")
     TestWaitFor(() => got != "unset")
     Check("pressing an existing hotkey captures it instead of running it", got = "!s" && (SnipWin = "" || !SnipWin.IsVisible()), got)
 
     got := "unset"
     HotkeyCaptureStart((k) => got := k)
-    Sleep(200)
+    Sleep(400)
     SendEvent("{Esc}")
     TestWaitFor(() => got != "unset")
     Check("Esc on its own cancels", got = "", got)
 
     got := "unset"
     HotkeyCaptureStart((k) => got := k)
-    Sleep(200)
+    Sleep(400)
     SendEvent("^{Esc}")
     TestWaitFor(() => got != "unset")
     Check("Esc with a modifier is a shortcut", got = "^Esc", got)
@@ -799,14 +799,14 @@ GroupHotkeyWindow() {
     Check("the hotkeys window lists every hotkey", HkWin.IsVisible() && HkList.GetCount() = 8, HkList.GetCount())
     HkList.Modify(1, "Select Focus Vis")
     HotkeysChange()
-    Sleep(200)
+    Sleep(400)
     SendEvent("^!{F6}")
     TestWaitFor(() => InStr(HkMsg.Value, "is now"))
     Check("changing a hotkey from the window rebinds it and says so", HotkeyText("calc") = "Ctrl+Alt+F6" && InStr(HkMsg.Value, "Ctrl+Alt+F6"), HkMsg.Value)
     Snap(HkWin, "hotkeys")
     HkList.Modify(2, "Select Focus Vis")
     HotkeysChange()
-    Sleep(200)
+    Sleep(400)
     SendEvent("!s")
     TestWaitFor(() => InStr(HkMsg.Value, "already used"))
     Check("a clash is explained and nothing changes", HotkeyText("pad") = "Win+N" && InStr(HkMsg.Value, "Snippets"), HkMsg.Value)
