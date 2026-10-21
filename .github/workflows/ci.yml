@@ -18,6 +18,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      # The secret scan skips the files the app writes into data/ (see .gitleaks.toml), so make
+      # sure none of them can be committed: that folder is the user's private runtime data.
+      - name: No runtime data is tracked
+        shell: pwsh
+        run: |
+          $tracked = @(git ls-files data)
+          if ($tracked.Count -gt 0) {
+            Write-Host "Files under data/ are tracked (runtime data must never be committed):"
+            $tracked | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+          Write-Host "No files under data/ are tracked."
       - name: Install AutoHotkey v2 (portable, pinned to the tested version)
         shell: pwsh
         env:
@@ -26,6 +38,9 @@ jobs:
           gh release download v2.0.28 --repo AutoHotkey/AutoHotkey --pattern 'AutoHotkey_2.0.28.zip' --dir "$env:RUNNER_TEMP"
           Expand-Archive "$env:RUNNER_TEMP\AutoHotkey_2.0.28.zip" -DestinationPath "$env:RUNNER_TEMP\ahk"
           "AHK_EXE=$env:RUNNER_TEMP\ahk\AutoHotkey64.exe" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Running-instance guard (stand-in script, quick)
+        shell: pwsh
+        run: ./tests/test-live-guard.ps1
       - name: Syntax check and self-test
         shell: pwsh
         run: ./tests/run-tests.ps1

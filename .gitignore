@@ -1,6 +1,10 @@
 # Runtime data: clipboard history, images, snippets, notes, logs (created next to hotstrings.ahk)
 data/
 
+# Settings exports hold your private snippets: keep them out of the repository
+snowtools-settings*.txt
+*.snowtools
+
 # Test output
 tests/shots/
 results.txt

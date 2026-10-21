@@ -71,6 +71,8 @@ New preferences need an entry in `SnowPrefDefaults` and a label in `SnowPrefLabe
 
 `tests/run-tests.ps1` runs `AutoHotkey64.exe /Validate hotstrings.ahk`, copies the project to a temp folder, and runs `tests/selftest.ahk` there, so real data is never touched. The self-test drives the real functions and windows, types into a scratch window to exercise hotstrings, and writes `results.txt`; the runner fails on any `FAIL` line, a crash or a timeout. In the self-test a crash must be fatal, so it replaces the app's error handler. Test images come from `tests/sample.ahk`, which draws and captures its own window rather than the screen.
 
+The runner shares the machine with a real Snow Tools when it is used from the development folder, and the two interfere: the live app reacts to the test's key presses (hotkeys fire in every process) and records its test clips. `tests/live-instances.ps1` finds running instances by script name (`hotstrings.ahk`, which the runner's own `selftest.ahk` never matches), and the runner refuses to start while one runs. With `-StopLive` it asks each instance to exit through its own Exit command (a `WM_COMMAND` to the script's hidden window, forced only after 8 seconds), and a `finally` block starts it again from the same script on every exit path. `tests/test-live-guard.ps1` exercises this with a stand-in script and runs in CI before the self-test.
+
 ## Adding a tool
 
 1. Create `features/<name>.ahk` and `#Include` it in `hotstrings.ahk` before `features\hud.ahk`.
