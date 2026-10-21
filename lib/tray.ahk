@@ -5,9 +5,10 @@ global SnowStartupLink := A_Startup "\Snow Tools.lnk"
 
 SnowTrayInit() {
     A_TrayMenu.Delete()
-    A_TrayMenu.Add("Show HUD (Alt+Y)", (*) => HudToggle())
-    A_TrayMenu.Add("Snippets... (Alt+S)", (*) => SnippetsToggle())
-    A_TrayMenu.Add("Settings... (Ctrl+Alt+S)", (*) => SettingsToggle())
+    hudItem := "Show HUD (" HotkeyText("hud") ")"
+    A_TrayMenu.Add(hudItem, (*) => HudToggle())
+    A_TrayMenu.Add("Snippets... (" HotkeyText("snippets") ")", (*) => SnippetsToggle())
+    A_TrayMenu.Add("Settings... (" HotkeyText("settings") ")", (*) => SettingsToggle())
     A_TrayMenu.Add()
     A_TrayMenu.Add("Open data folder", (*) => SnowOpenDataFolder())
     A_TrayMenu.Add("Open error log", (*) => SnowOpenLog())
@@ -15,7 +16,7 @@ SnowTrayInit() {
     A_TrayMenu.Add("Run at startup", SnowToggleStartup)
     A_TrayMenu.Add("Reload", (*) => Reload())
     A_TrayMenu.Add("Exit", (*) => ExitApp())
-    A_TrayMenu.Default := "Show HUD (Alt+Y)"
+    A_TrayMenu.Default := hudItem
     SnowStartupRefresh()
 }
 

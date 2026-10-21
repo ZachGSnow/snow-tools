@@ -24,7 +24,11 @@ tools/              showcase.ahk: documentation screenshots
 
 ## Registry
 
-A tool calls `RegHotkey(key, description, fn)`, which both binds the hotkey and records it. Things defined by other means (a context-sensitive hotkey, an automatic behavior) call `RegDoc(kind, key, description)`. The HUD never keeps its own list: it renders the registry. Snippets are re-registered into it whenever they change, and the HUD is dropped and rebuilt the next time it opens.
+A tool calls `RegHotkey(id, defaultKey, description, fn)`, which both binds the hotkey and records it. Things defined by other means (a context-sensitive hotkey, an automatic behavior) call `RegDoc(kind, key, description)`. The HUD never keeps its own list: it renders the registry. Snippets are re-registered into it whenever they change, and the HUD is dropped and rebuilt the next time it opens.
+
+Global hotkeys are rebindable. `id` is a short stable name (`pad`, `clips`) and is what is saved: a changed key lives in `data\prefs.ini` under `[hotkeys]`, and a hotkey on its default key has no entry. At start `RegHotkey` uses the saved key if it still passes `HotkeyCheck` and no other hotkey has it, and otherwise the default (the reason goes to the log). `HotkeyRebind` validates, checks for a clash, binds the new key before releasing the old one, updates the HUD entry, saves, and rebuilds the tray menu and HUD so every printed shortcut is current. `HotkeyRebindMany` releases all the old keys before binding any new one, which is what makes a swap work. Labels elsewhere (HUD footer, tray menu, Settings) read the live key through `HotkeyText(id)`, never a hardcoded string.
+
+`HotkeyCheck` is the single rule set: a supported key (letters, digits, F1-F24, named keys), at least one of Ctrl, Alt or Win unless it is an F-key, each modifier once, and not in `SnowHotkeyReserved`. `HotkeyNormalize` gives one spelling per shortcut (modifier order, case, `Escape` as `esc`) so clashes are found by meaning. Key capture (`features/hotkeys.ahk`) is an `InputHook` that swallows every key, tracks the modifiers itself from key-down and key-up events, and reports the first non-modifier key as a shortcut; Esc on its own cancels. The script's hotkeys are suspended during capture and always resumed through the hook's end callback.
 
 ## The character grid
 
@@ -46,12 +50,12 @@ Capture is `OnClipboardChange` in `features/clipboard.ahk`. Before anything is r
 
 ## Export and import
 
-`features/transfer.ahk` moves preferences and snippets as one text file: a `format = N` header, a `[prefs]` section (`section.key = 0|1`) and a `[snippets]` section in the same encoding as `snippets.txt` (the line parser, `SnipParseLine`, is shared with the loader). The work is split into small steps so each can be tested alone:
+`features/transfer.ahk` moves preferences, hotkeys and snippets as one text file: a `format = N` header, a `[prefs]` section (`section.key = 0|1`), a `[hotkeys]` section (`id = key`) and a `[snippets]` section in the same encoding as `snippets.txt` (the line parser, `SnipParseLine`, is shared with the loader). The work is split into small steps so each can be tested alone:
 
 1. **`TransferParse(text)`** is pure. It reads the text and returns what it understood plus a list of what it skipped, and never touches the live state. Unknown preferences, values other than 0 or 1, invalid or duplicate triggers, oversized snippets, unknown sections, files over 1 MB and a `format` newer than this version are all handled there, so a hostile or hand-edited file cannot do more than be rejected or partly ignored.
-2. **`TransferPlan(parsed)`** compares the parse with the current state: which preferences would change, how many snippets are new, changed or identical, how many of yours a replace would drop. A preference whose new value lowers privacy (`SnowPrefRisky` in `lib/settings.ahk`) is flagged.
+2. **`TransferPlan(parsed)`** compares the parse with the current state: which preferences would change, which hotkeys would move, how many snippets are new, changed or identical, how many of yours a replace would drop. A preference whose new value lowers privacy (`SnowPrefRisky` in `lib/settings.ahk`) is flagged. A hotkey move that would leave two hotkeys on one shortcut is marked skipped (both moves of a clashing pair are skipped, and a move onto an unchanged hotkey's key is skipped); a pure swap is not a clash.
 3. **The dialog** shows the plan and does nothing until a button is pressed.
-4. **`TransferApply(plan, mode, allowRisky)`** writes a backup of the current state to `data\backup\` first (newest 10 kept), then applies preferences and snippets and re-registers the hotstrings, so everything takes effect without a reload. Flagged preferences are held back unless `allowRisky` is true, which only the dialog's separate opt-in sets; replace is refused when the file has no snippets.
+4. **`TransferApply(plan, mode, allowRisky)`** writes a backup of the current state to `data\backup\` first (newest 10 kept), then applies preferences, moves the hotkeys in one bulk call and applies snippets, re-registering the hotstrings, so everything takes effect without a reload. Flagged preferences are held back unless `allowRisky` is true, which only the dialog's separate opt-in sets; replace is refused when the file has no snippets.
 
 New preferences need an entry in `SnowPrefDefaults` and a label in `SnowPrefLabels`; export and import pick them up from there.
 

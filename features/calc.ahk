@@ -6,7 +6,7 @@ global CalcWin := ""
 global CalcInput := ""
 global CalcResult := ""
 
-RegHotkey("!c", "Snow Calc: time diff (1100-1115) and math", CalcToggle)
+RegHotkey("calc", "!c", "Snow Calc: time diff (1100-1115) and math", CalcToggle)
 
 CalcBuild() {
     global CalcWin, CalcInput, CalcResult

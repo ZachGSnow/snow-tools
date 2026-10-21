@@ -5,7 +5,7 @@
 global HudWin := ""
 global HudStatus := ""
 
-RegHotkey("!y", "This overlay: every hotkey and hotstring", HudToggle)
+RegHotkey("hud", "!y", "This overlay: every hotkey and hotstring", HudToggle)
 OnMessage(0x0006, HudOnActivate)    ; WM_ACTIVATE
 
 HudToggle(*) {
@@ -78,13 +78,17 @@ HudBuild() {
         row += g.items.Length + 1
     }
     w.Rule(rows - 4)
-    w.Btn(2, rows - 3, "[snippets  Alt+S]", HudAction.Bind(SnippetsToggle))
-    w.Btn(21, rows - 3, "[error log]", HudAction.Bind(SnowOpenLog))
-    w.Btn(34, rows - 3, "[data folder]", HudAction.Bind(SnowOpenDataFolder))
-    w.Btn(49, rows - 3, "[reload script]", HudAction.Bind((*) => Reload()))
-    w.Btn(67, rows - 3, "[settings  Ctrl+Alt+S]", HudAction.Bind(SettingsToggle))
+    col := 2
+    for b in [["[snippets  " HotkeyText("snippets") "]", SnippetsToggle]
+            , ["[error log]", SnowOpenLog]
+            , ["[data folder]", SnowOpenDataFolder]
+            , ["[reload script]", (*) => Reload()]
+            , ["[settings  " HotkeyText("settings") "]", SettingsToggle]] {
+        w.Btn(col, rows - 3, b[1], HudAction.Bind(b[2]))
+        col += StrLen(b[1]) + 2
+    }
     HudStatus := w.Add("Text", 2, rows - 2, cols - 4, 1, "-Wrap 0x80 c" THEME_FG_DIM, "")
-    w.SetStatus("esc or alt+y closes")
+    w.SetStatus("esc or " StrLower(HotkeyText("hud")) " closes")
 }
 
 ; Footer actions: close the HUD first, then run the action.

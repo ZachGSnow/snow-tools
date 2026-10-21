@@ -624,6 +624,242 @@ GroupTransferDialog() {
     SnowPrefSet("clips.skipsensitive", "1")
 }
 
+TestWaitFor(fn, ms := 5000) {
+    t0 := A_TickCount
+    while (A_TickCount - t0 < ms) {
+        if fn()
+            return true
+        Sleep(50)
+    }
+    return false
+}
+
+; Sends keys with a scratch window focused (so a stray key cannot land in another program),
+; at send level 1 so this script's own hotkeys react.
+TestSend(keys) {
+    SendLevel(1)
+    TypeBegin()
+    SendEvent(keys)
+    Sleep(500)
+    TypeEnd()
+}
+
+Group("hotkeys: rules", GroupHotkeyRules)
+GroupHotkeyRules() {
+    ok := true
+    for k in ["^!F9", "#n", "!c", "^!Space", "F5", "+F5", "^!k", "^!Home", "^!Escape"]
+        if (HotkeyCheck(k) != "")
+            ok := false, bad := k
+    Check("sensible shortcuts are accepted", ok, IsSet(bad) ? bad : "")
+    rejected := true
+    for k in ["", "a", "+a", "^", "^!", "^;", "^!F25", "^^a", "^c", "!F4", "#l", "^!Delete", "^v"]
+        if (HotkeyCheck(k) = "")
+            rejected := false, bad2 := k
+    Check("plain keys, unsupported keys, duplicates and reserved shortcuts are refused", rejected, IsSet(bad2) ? bad2 : "")
+    Check("a shortcut on a plain key says why", InStr(HotkeyCheck("a"), "break typing"))
+    Check("shortcuts compare by meaning, not spelling", HotkeyNormalize("#^!x") = "^!#x"
+        && HotkeyNormalize("!+A") = HotkeyNormalize("+!a") && HotkeyNormalize("^!Escape") = "^!esc")
+    Check("a captured key is built in a fixed order", HotkeyBuild("#^", "N") = "^#n" && HotkeyBuild("", "Escape") = "Esc"
+        && HotkeyBuild("^!", "F9") = "^!F9" && HotkeyBuild("+", "A") = "+a")
+    Check("virtual-key codes map to modifiers", HotkeyModOf(0x5B) = "#" && HotkeyModOf(0xA2) = "^" && HotkeyModOf(0xA4) = "!"
+        && HotkeyModOf(0x10) = "+" && HotkeyModOf(0x41) = "")
+}
+
+Group("hotkeys: rebinding", GroupHotkeyRebind)
+GroupHotkeyRebind() {
+    Check("every global hotkey has an id", SnowHotkeys.Count = 8 && HotkeyText("pad") = "Win+N" && HotkeyText("hud") = "Alt+Y"
+        , SnowHotkeys.Count)
+    r := HotkeyRebind("calc", "^!F8")
+    entry := ""
+    for e in SnowRegistry
+        if (e.HasOwnProp("id") && e.id = "calc")
+            entry := e
+    Check("rebinding changes the key, the HUD entry and the saved choice", r.ok && HotkeyText("calc") = "Ctrl+Alt+F8"
+        && entry.key = "Ctrl+Alt+F8" && IniRead(SnowPrefsPath, "hotkeys", "calc", "") = "^!F8" && HudWin = "", r.error)
+    TestSend("^!{F8}")
+    Check("the new shortcut works at once", IsObject(CalcWin) && CalcWin.IsVisible())
+    CalcClose()
+    TestSend("!c")
+    Check("the old shortcut no longer does", !CalcWin.IsVisible())
+    Check("a shortcut already used is refused and names its owner", !HotkeyRebind("pad", "!s").ok
+        && InStr(HotkeyRebind("pad", "!s").error, "Snippets") && HotkeyText("pad") = "Win+N")
+    Check("reserved and plain-key shortcuts are refused and nothing changes", !HotkeyRebind("pad", "^c").ok
+        && !HotkeyRebind("pad", "a").ok && HotkeyText("pad") = "Win+N")
+    r := HotkeyReset("calc")
+    Check("reset returns the default and forgets the saved choice", r.ok && HotkeyText("calc") = "Alt+C"
+        && IniRead(SnowPrefsPath, "hotkeys", "calc", "") = "")
+    TestSend("!c")
+    Check("the default works again", CalcWin.IsVisible())
+    CalcClose()
+
+    failed := HotkeyRebindMany([{id: "calc", key: "^!F8"}])
+    TestSend("!c")
+    stale := IsObject(CalcWin) && CalcWin.IsVisible()
+    CalcClose()
+    Check("moving a hotkey with the bulk call releases its old key", failed.Length = 0 && HotkeyText("calc") = "Ctrl+Alt+F8" && !stale)
+    HotkeysResetAll()
+
+    failed := HotkeyRebindMany([{id: "calc", key: "!s"}, {id: "snippets", key: "!c"}])
+    Check("two hotkeys can swap keys", failed.Length = 0 && HotkeyText("calc") = "Alt+S" && HotkeyText("snippets") = "Alt+C")
+    TestSend("!s")
+    swapped1 := CalcWin.IsVisible()
+    CalcClose()
+    TestSend("!c")
+    swapped2 := SnipWin != "" && SnipWin.IsVisible()
+    if (SnipWin != "")
+        SnipWin.Hide()
+    Check("after a swap each key runs the other's action", swapped1 && swapped2)
+    HotkeysResetAll()
+    Check("reset all restores every default and clears the saved choices", HotkeyText("calc") = "Alt+C" && HotkeyText("snippets") = "Alt+S"
+        && IniRead(SnowPrefsPath, "hotkeys", "calc", "") = "" && IniRead(SnowPrefsPath, "hotkeys", "snippets", "") = "")
+}
+
+Group("hotkeys: labels follow the key", GroupHotkeyLabels)
+GroupHotkeyLabels() {
+    HotkeyRebind("hud", "^!F5")
+    trayNew := true
+    try A_TrayMenu.Check("Show HUD (Ctrl+Alt+F5)")
+    catch
+        trayNew := false
+    trayOld := true
+    try A_TrayMenu.Check("Show HUD (Alt+Y)")
+    catch
+        trayOld := false
+    HudToggle()
+    status := HudWin.pBotStatus.Value
+    HudWin.Hide()
+    Check("the tray menu and the HUD footer show the new key", trayNew && !trayOld && InStr(status, "ctrl+alt+f5"), status)
+    HotkeysResetAll()
+    HudToggle()
+    status := HudWin.pBotStatus.Value
+    HudWin.Hide()
+    Check("and the default again after a reset", InStr(status, "alt+y") && !InStr(status, "ctrl+alt+f5"), status)
+}
+
+Group("hotkeys: saved choices at start", GroupHotkeyStart)
+GroupHotkeyStart() {
+    IniWrite("^!F6", SnowPrefsPath, "hotkeys", "tmpa")
+    IniWrite("^c", SnowPrefsPath, "hotkeys", "tmpb")
+    IniWrite("!s", SnowPrefsPath, "hotkeys", "tmpc")
+    RegHotkey("tmpa", "^!F5", "temp a", (*) => 0)
+    RegHotkey("tmpb", "^!F4", "temp b", (*) => 0)
+    RegHotkey("tmpc", "^!F3", "temp c", (*) => 0)
+    Check("a saved key replaces the default", HotkeyText("tmpa") = "Ctrl+Alt+F6")
+    Check("a saved key that is invalid or already in use is ignored", HotkeyText("tmpb") = "Ctrl+Alt+F4" && HotkeyText("tmpc") = "Ctrl+Alt+F3")
+    for id in ["tmpa", "tmpb", "tmpc"] {
+        try Hotkey(SnowHotkeys[id].key, "Off")
+        SnowRegistry.RemoveAt(SnowRegistry.Length)
+        SnowHotkeys.Delete(id)
+        SnowHotkeyOrder.Pop()
+        IniDelete(SnowPrefsPath, "hotkeys", id)
+    }
+    Check("the temporary hotkeys are gone", SnowHotkeys.Count = 8 && SnowHotkeyOrder.Length = 8)
+}
+
+Group("hotkeys: capture", GroupHotkeyCapture)
+GroupHotkeyCapture() {
+    got := "unset"
+    HotkeyCaptureStart((k) => got := k)
+    Sleep(400)
+    SendEvent("^!{F7}")
+    TestWaitFor(() => got != "unset")
+    Check("a shortcut is captured with its modifiers", got = "^!F7", got)
+    Check("the script's hotkeys are active again afterwards", !A_IsSuspended)
+
+    got := "unset"
+    HotkeyCaptureStart((k) => got := k)
+    Sleep(400)
+    SendEvent("!s")
+    TestWaitFor(() => got != "unset")
+    Check("pressing an existing hotkey captures it instead of running it", got = "!s" && (SnipWin = "" || !SnipWin.IsVisible()), got)
+
+    got := "unset"
+    HotkeyCaptureStart((k) => got := k)
+    Sleep(400)
+    SendEvent("{Esc}")
+    TestWaitFor(() => got != "unset")
+    Check("Esc on its own cancels", got = "", got)
+
+    got := "unset"
+    HotkeyCaptureStart((k) => got := k)
+    Sleep(400)
+    SendEvent("^{Esc}")
+    TestWaitFor(() => got != "unset")
+    Check("Esc with a modifier is a shortcut", got = "^Esc", got)
+
+    got := "unset"
+    HotkeyCaptureStart((k) => got := k, 1)
+    TestWaitFor(() => got != "unset", 3000)
+    Check("capture gives up after the timeout", got = "" && !A_IsSuspended, got)
+}
+
+Group("hotkeys: window", GroupHotkeyWindow)
+GroupHotkeyWindow() {
+    HotkeysToggle()
+    Check("the hotkeys window lists every hotkey", HkWin.IsVisible() && HkList.GetCount() = 8, HkList.GetCount())
+    HkList.Modify(1, "Select Focus Vis")
+    HotkeysChange()
+    Sleep(400)
+    SendEvent("^!{F6}")
+    TestWaitFor(() => InStr(HkMsg.Value, "is now"))
+    Check("changing a hotkey from the window rebinds it and says so", HotkeyText("calc") = "Ctrl+Alt+F6" && InStr(HkMsg.Value, "Ctrl+Alt+F6"), HkMsg.Value)
+    Snap(HkWin, "hotkeys")
+    HkList.Modify(2, "Select Focus Vis")
+    HotkeysChange()
+    Sleep(400)
+    SendEvent("!s")
+    TestWaitFor(() => InStr(HkMsg.Value, "already used"))
+    Check("a clash is explained and nothing changes", HotkeyText("pad") = "Win+N" && InStr(HkMsg.Value, "Snippets"), HkMsg.Value)
+    HkList.Modify(1, "Select Focus Vis")
+    HotkeysReset()
+    Check("reset in the window restores the default", HotkeyText("calc") = "Alt+C")
+    HotkeysResetEveryone()
+    HotkeysClose()
+}
+
+Group("hotkeys: export and import", GroupHotkeyTransfer)
+GroupHotkeyTransfer() {
+    text := TransferExportText()
+    Check("an export lists the hotkeys", InStr(text, "[hotkeys]") && InStr(text, "calc = !c") && InStr(text, "pad = #n"))
+    HotkeyRebind("note", "^!F4")
+    text := TransferExportText()
+    HotkeysResetAll()
+    plan := TransferPlan(TransferParse(text))
+    r := TransferApply(plan, "merge", false)
+    Check("importing an export restores a changed hotkey", plan.hotkeys.Length = 1 && r.ok && HotkeyText("note") = "Ctrl+Alt+F4"
+        && InStr(r.message, "1 hotkeys"), r.message)
+    HotkeysResetAll()
+
+    p := TransferParse("format = 1`n[hotkeys]`nnope = ^!x`ncalc = ^c`npad = ^!F3`n")
+    Check("unknown ids and unusable shortcuts are skipped and listed", p.ok && p.hotkeys.Count = 1 && p.hotkeys["pad"] = "^!F3"
+        && p.ignored.Length = 2, p.ignored.Length)
+
+    clash := TransferPlan(TransferParse("format = 1`n[hotkeys]`ncalc = ^!F2`nnote = ^!F2`npad = !s`n"))
+    skipped := 0
+    for h in clash.hotkeys
+        if (h.skip != "")
+            skipped++
+    Check("moves that would clash are skipped, including onto an unchanged hotkey", clash.hotkeys.Length = 3 && skipped = 3, skipped)
+    r := TransferApply(clash, "merge", false)
+    Check("applying skips them and changes nothing", HotkeyText("calc") = "Alt+C" && HotkeyText("note") = "Alt+N" && HotkeyText("pad") = "Win+N")
+
+    swap := TransferPlan(TransferParse("format = 1`n[hotkeys]`ncalc = !s`nsnippets = !c`n"))
+    Check("a swap in a file is not treated as a clash", swap.hotkeys.Length = 2 && swap.hotkeys[1].skip = "" && swap.hotkeys[2].skip = "")
+    Check("the summary shows the hotkey changes", InStr(TransferSummaryText("x.txt", swap), "Snow Calc: time diff (1100-1115) and math: Alt+C -> Alt+S"))
+    TransferApply(swap, "merge", false)
+    Check("a swap in a file is applied", HotkeyText("calc") = "Alt+S" && HotkeyText("snippets") = "Alt+C")
+    HotkeysResetAll()
+    SettingsAskConfirm := true
+}
+
+Group("hotkeys: reset settings", GroupHotkeyReset)
+GroupHotkeyReset() {
+    HotkeyRebind("note", "^!F4")
+    TestAnswer("Button1")
+    SettingsReset()
+    Check("reset settings also restores the hotkeys", HotkeyText("note") = "Alt+N" && IniRead(SnowPrefsPath, "hotkeys", "note", "") = "")
+}
+
 ; --------------------------------------------------------------------------
 if (TestSavedClip != "")
     try A_Clipboard := TestSavedClip
