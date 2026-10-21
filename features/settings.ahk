@@ -6,6 +6,7 @@
 global SettingsWin := ""
 global SettingsChecks := []        ; [{ctrl, label, get}] one per checkbox row
 global SettingsSensNote := ""
+global SettingsPauseHint := ""
 global SettingsDataInfo := ""
 global SettingsAskConfirm := true  ; the self-test turns this off
 
@@ -14,37 +15,43 @@ global WipeInfo := ""
 global WipeEdit := ""
 global WipeMsg := ""
 
-RegHotkey("^!s", "Settings: clipboard options, delete data", SettingsToggle)
+RegHotkey("settings", "^!s", "Settings: clipboard options, delete data", SettingsToggle)
 
 ; ---------------------------------------------------------------------------
 ; Window
 ; ---------------------------------------------------------------------------
 SettingsBuild() {
-    global SettingsWin, SettingsSensNote, SettingsDataInfo
-    w := SnowWin("SETTINGS", 84, 25)
+    global SettingsWin, SettingsSensNote, SettingsDataInfo, SettingsPauseHint
+    w := SnowWin("SETTINGS", 84, 28)
     SettingsWin := w
     w.Put(2, 1, "CLIPBOARD", THEME_ACCENT)
     SettingsAddCheck(w, 3, "Skip copies flagged by password managers", () => SnowPrefBool("clips.skipsensitive"), SettingsSetSensitive)
     SettingsSensNote := w.Add("Text", 6, 4, 76, 1, "-Wrap 0x80 c" THEME_FG_DIM, "")
     SettingsAddCheck(w, 6, "Turn START/END time blocks into decimal hours", () => ClipAutoDecimal, ClipSetAutoDecimal)
     w.Put(6, 7, "START: 0905 | END: 0950 puts 0.75 on the clipboard", THEME_FG_DIM)
-    SettingsAddCheck(w, 9, "Pause recording  (Ctrl+Alt+P)", () => ClipPaused, SettingsSetPaused)
+    SettingsAddCheck(w, 9, "Pause recording", () => ClipPaused, SettingsSetPaused)
+    SettingsPauseHint := w.Add("Text", 22, 9, 40, 1, "-Wrap 0x80 c" THEME_FG_DIM, "")
 
     w.Rule(11)
-    w.Put(2, 12, "DATA", THEME_ACCENT)
-    SettingsDataInfo := w.Add("Text", 2, 13, 80, 1, "-Wrap 0x80 c" THEME_FG_DIM, "")
-    w.Btn(2, 15, "[clear clipboard history]", SettingsClearHistory)
-    w.Put(30, 15, "every clip and image, pinned included", THEME_FG_DIM)
-    w.Btn(2, 16, "[delete all data]", SettingsDeleteAll)
-    w.Put(30, 16, "clips, images, pad, sticky notes and the log", THEME_FG_DIM)
-    w.Btn(2, 17, "[reset settings]", SettingsReset)
-    w.Put(30, 17, "preferences and snippets back to the defaults", THEME_FG_DIM)
-    w.Btn(2, 18, "[export settings...]", SettingsExportClick)
-    w.Put(30, 18, "preferences and snippets to a text file", THEME_FG_DIM)
-    w.Btn(2, 19, "[import settings...]", SettingsImportClick)
-    w.Put(30, 19, "from an export; shows what changes first", THEME_FG_DIM)
-    w.Btn(2, 20, "[open data folder]", (*) => SnowOpenDataFolder())
-    w.Put(2, 22, "Deleting is a normal file delete, not a secure erase.", THEME_FG_DIM)
+    w.Put(2, 12, "SHORTCUTS", THEME_ACCENT)
+    w.Btn(2, 13, "[change hotkeys...]", (*) => HotkeysToggle())
+    w.Put(30, 13, "rebind any of the global shortcuts", THEME_FG_DIM)
+
+    w.Rule(15)
+    w.Put(2, 16, "DATA", THEME_ACCENT)
+    SettingsDataInfo := w.Add("Text", 2, 17, 80, 1, "-Wrap 0x80 c" THEME_FG_DIM, "")
+    w.Btn(2, 19, "[clear clipboard history]", SettingsClearHistory)
+    w.Put(30, 19, "every clip and image, pinned included", THEME_FG_DIM)
+    w.Btn(2, 20, "[delete all data]", SettingsDeleteAll)
+    w.Put(30, 20, "clips, images, pad, sticky notes and the log", THEME_FG_DIM)
+    w.Btn(2, 21, "[reset settings]", SettingsReset)
+    w.Put(30, 21, "preferences, hotkeys, snippets back to defaults", THEME_FG_DIM)
+    w.Btn(2, 22, "[export settings...]", SettingsExportClick)
+    w.Put(30, 22, "preferences, hotkeys, snippets to a text file", THEME_FG_DIM)
+    w.Btn(2, 23, "[import settings...]", SettingsImportClick)
+    w.Put(30, 23, "from an export; shows what changes first", THEME_FG_DIM)
+    w.Btn(2, 24, "[open data folder]", (*) => SnowOpenDataFolder())
+    w.Put(2, 26, "Deleting is a normal file delete, not a secure erase.", THEME_FG_DIM)
     w.SetStatus("esc closes")
 }
 
@@ -61,9 +68,10 @@ SettingsFlip(get, set) {
 }
 
 SettingsRefresh() {
-    global SettingsChecks, SettingsSensNote, SettingsDataInfo, ClipTexts, ClipImages
+    global SettingsChecks, SettingsSensNote, SettingsDataInfo, SettingsPauseHint, ClipTexts, ClipImages
     if (SettingsWin = "")
         return
+    SettingsPauseHint.Value := "(" HotkeyText("pause") ")"
     for c in SettingsChecks {
         get := c.get    ; a function stored in an object is not called as a method
         c.ctrl.Value := (get() ? "[x] " : "[ ] ") c.label
@@ -169,8 +177,9 @@ SettingsImportClick(*) {
 
 SettingsReset(*) {
     global SettingsAskConfirm
-    if (SettingsAskConfirm && !SettingsConfirm("Reset settings?`n`nPreferences go back to their defaults and your snippets are replaced by the built-in set. Clips and notes are not touched."))
+    if (SettingsAskConfirm && !SettingsConfirm("Reset settings?`n`nPreferences and hotkeys go back to their defaults and your snippets are replaced by the built-in set. Clips and notes are not touched."))
         return
+    HotkeysResetAll()
     SnowPrefsReset()
     ClipApplyPrefs()
     SnippetsResetToDefaults()

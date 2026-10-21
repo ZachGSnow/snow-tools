@@ -91,9 +91,18 @@ SettingsWipeDialog()
 Snap(WipeWin, "delete-confirm")
 WipeWin.Hide()
 
+; --- hotkeys window with one shortcut changed
+HotkeyRebind("note", "^!n")
+HotkeysToggle()
+HkList.Modify(3, "Select Focus Vis")
+Snap(HkWin, "hotkeys")
+HotkeysClose()
+HotkeysResetAll()
+
 ; --- import dialog: a made-up export from a colleague
 sample := A_ScriptDir "\colleague-settings.txt"
 FileOpen(sample, "w", "UTF-8").Write("# Snow Tools settings`nformat = 1`n[prefs]`nclips.autodecimal = 0`nclips.skipsensitive = 1`n"
+    . "[hotkeys]`npad = ^!n`n"
     . "[snippets]`nzem = jordan.lee@contoso.com`nzph = 555-0100`nsignoff = Thanks,\nJordan Lee\nContoso Service Desk`n"
     . "zip = 192.0.2.14`n")
 TransferImportStart(sample)

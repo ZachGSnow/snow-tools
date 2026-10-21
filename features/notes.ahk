@@ -13,7 +13,7 @@ global PadLastSaved := ""
 global PadPath := SnowDataDir "\quicknotes.txt"
 global PadPosPath := SnowDataDir "\quicknotes_pos.txt"
 
-RegHotkey("#n", "Snow Pad: scratch notes, auto-saves (Ctrl+F finds)", PadToggle)
+RegHotkey("pad", "#n", "Snow Pad: scratch notes, auto-saves (Ctrl+F finds)", PadToggle)
 
 PadBuild() {
     global PadWin, PadEdit, PadSearch, PadFindBtn
@@ -174,7 +174,7 @@ global StickyNotes := Map()
 global StickyNextId := 1
 global StickyDir := SnowDataDir "\stickies\"
 
-RegHotkey("!n", "Snow Note: new sticky note", StickyNew)
+RegHotkey("note", "!n", "Snow Note: new sticky note", StickyNew)
 
 StickyCreate(id, x, y, content := "", w := 270, h := 210) {
     global StickyNotes, StickyDir

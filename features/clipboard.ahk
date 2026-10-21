@@ -19,8 +19,8 @@ global ClipPaused := false
 ClipStoreInit()
 OnClipboardChange(ClipChanged)
 
-RegHotkey("^!v", "Snow Clips: clipboard history, text + image preview", ClipToggle)
-RegHotkey("^!p", "Snow Clips: pause / resume recording", ClipTogglePause)
+RegHotkey("clips", "^!v", "Snow Clips: clipboard history, text + image preview", ClipToggle)
+RegHotkey("pause", "^!p", "Snow Clips: pause / resume recording", ClipTogglePause)
 RegDoc("auto", "clipboard", "START/END time blocks become decimal hours (Ctrl+T in Snow Clips)")
 RegDoc("auto", "clipboard", "copies flagged by password managers are skipped (Settings)")
 

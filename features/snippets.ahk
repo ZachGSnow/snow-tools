@@ -21,7 +21,7 @@ global SnipSelected := 0       ; index into Snippets being edited (0 = a new sni
 global SnipBusy := false
 global SnipAskConfirm := true  ; the self-test turns this off
 
-RegHotkey("!s", "Snippets: add / edit / delete text expansions", SnippetsToggle)
+RegHotkey("snippets", "!s", "Snippets: add / edit / delete text expansions", SnippetsToggle)
 
 SnippetsLoad()
 SnippetsApply()

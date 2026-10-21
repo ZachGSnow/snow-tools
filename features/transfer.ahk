@@ -1,14 +1,16 @@
 ; ===== SETTINGS EXPORT AND IMPORT =====
-; One plain-text file holds your preferences and snippets so they can move to another
-; machine or be restored. The file is untrusted input when imported: it is parsed strictly
-; (known preferences only, valid triggers only, size limits), summarized first, and your
-; current settings are backed up before anything changes. Clips and notes are data, not
-; settings, and are never exported.
+; One plain-text file holds your preferences, hotkeys and snippets so they can move to
+; another machine or be restored. The file is untrusted input when imported: it is parsed
+; strictly (known preferences and hotkey ids only, valid shortcuts and triggers only, size
+; limits), summarized first, and your current settings are backed up before anything
+; changes. Clips and notes are data, not settings, and are never exported.
 ;
 ;     # comments
 ;     format = 1
 ;     [prefs]
 ;     clips.skipsensitive = 1
+;     [hotkeys]
+;     pad = #n
 ;     [snippets]
 ;     trigger = text            (same encoding as data\snippets.txt)
 
@@ -23,7 +25,7 @@ global TransferBackupDir := SnowDataDir "\backup"
 ; Export
 ; ---------------------------------------------------------------------------
 TransferExportText() {
-    global Snippets, SnowPrefDefaults, TRANSFER_FORMAT
+    global Snippets, SnowPrefDefaults, SnowHotkeys, SnowHotkeyOrder, TRANSFER_FORMAT
     s := "# Snow Tools settings`n"
         . "# Plain text. Review it before sharing: snippets may contain private text.`n"
         . "format = " TRANSFER_FORMAT "`n"
@@ -31,6 +33,9 @@ TransferExportText() {
         . "[prefs]`n"
     for name, def in SnowPrefDefaults
         s .= name " = " SnowPrefGet(name) "`n"
+    s .= "`n[hotkeys]`n"
+    for id in SnowHotkeyOrder
+        s .= id " = " SnowHotkeys[id].key "`n"
     s .= "`n[snippets]`n"
     for sn in Snippets
         s .= sn.trigger " = " SnipEncode(sn.text) "`n"
@@ -48,11 +53,12 @@ TransferExportFile(path) {
 ; ---------------------------------------------------------------------------
 ; Parse (pure: reads text, changes nothing)
 ; ---------------------------------------------------------------------------
-; Returns {ok, error, format, prefs: Map name->"0"/"1", snippets: [{trigger, text}],
-; ignored: [reasons]}. Anything it does not recognise is skipped and listed, never applied.
+; Returns {ok, error, format, prefs: Map name->"0"/"1", hotkeys: Map id->key,
+; snippets: [{trigger, text}], ignored: [reasons]}. Anything it does not recognise is
+; skipped and listed, never applied.
 TransferParse(text) {
-    global SnowPrefDefaults, TRANSFER_FORMAT, TRANSFER_MAX_BYTES, TRANSFER_MAX_SNIPPETS, TRANSFER_MAX_TEXT
-    res := {ok: false, error: "", format: 0, prefs: Map(), snippets: [], ignored: []}
+    global SnowPrefDefaults, SnowHotkeys, TRANSFER_FORMAT, TRANSFER_MAX_BYTES, TRANSFER_MAX_SNIPPETS, TRANSFER_MAX_TEXT
+    res := {ok: false, error: "", format: 0, prefs: Map(), hotkeys: Map(), snippets: [], ignored: []}
     if (StrLen(text) > TRANSFER_MAX_BYTES) {
         res.error := "The file is larger than 1 MB, so it is not a settings export."
         return res
@@ -69,7 +75,7 @@ TransferParse(text) {
             continue
         if RegExMatch(t, "^\[([^\]=]+)\]$", &m) {
             section := StrLower(Trim(m[1]))
-            if (section != "prefs" && section != "snippets")
+            if (section != "prefs" && section != "hotkeys" && section != "snippets")
                 Ignore("section [" section "] is not supported by this version")
             continue
         }
@@ -93,6 +99,19 @@ TransferParse(text) {
             } else {
                 res.prefs[name] := value
             }
+        } else if (section = "hotkeys") {
+            eq := InStr(t, "=")
+            if (eq < 2) {
+                Ignore("unreadable hotkey line")
+                continue
+            }
+            id := Trim(SubStr(t, 1, eq - 1))
+            key := Trim(SubStr(t, eq + 1))
+            problem := SnowHotkeys.Has(id) ? HotkeyCheck(key) : "unknown hotkey"
+            if (problem != "")
+                Ignore("hotkey " id ": " problem)
+            else
+                res.hotkeys[id] := key
         } else if (section = "snippets") {
             sn := SnipParseLine(line)
             if (sn = "") {
@@ -156,8 +175,45 @@ TransferPlan(parsed) {
     for key, text in mine
         if !theirs.Has(key)
             removed++
-    return {prefs: prefs, snippets: parsed.snippets, added: added, changed: changed, same: same
-        , removed: removed, ignored: parsed.ignored}
+    return {prefs: prefs, hotkeys: TransferHotkeyChanges(parsed.hotkeys), snippets: parsed.snippets
+        , added: added, changed: changed, same: same, removed: removed, ignored: parsed.ignored}
+}
+
+; Which hotkeys the file would move, as [{id, desc, from, to, key, skip}]. A move that would
+; leave two hotkeys on the same shortcut is skipped (skip holds the reason); skipping one can
+; expose another clash, so this repeats until nothing changes.
+TransferHotkeyChanges(wanted) {
+    global SnowHotkeys, SnowHotkeyOrder
+    moves := []
+    for id in SnowHotkeyOrder {
+        if !wanted.Has(id)
+            continue
+        hk := SnowHotkeys[id]
+        if (HotkeyNormalize(wanted[id]) = HotkeyNormalize(hk.key))
+            continue
+        moves.Push({id: id, desc: hk.desc, from: HotkeyLabel(hk.key), to: HotkeyLabel(wanted[id]), key: wanted[id], skip: ""})
+    }
+    Loop {
+        final := Map()
+        for id in SnowHotkeyOrder
+            final[id] := HotkeyNormalize(SnowHotkeys[id].key)
+        for m in moves
+            if (m.skip = "")
+                final[m.id] := HotkeyNormalize(m.key)
+        again := false
+        for m in moves {
+            if (m.skip != "")
+                continue
+            for id, norm in final {
+                if (id != m.id && norm = final[m.id]) {
+                    m.skip := "clashes with: " SnowHotkeys[id].desc
+                    again := true
+                    break
+                }
+            }
+        }
+    } until !again
+    return moves
 }
 
 ; ---------------------------------------------------------------------------
@@ -209,6 +265,12 @@ TransferApply(plan, mode, allowRisky := false) {
         applied++
     }
     ClipApplyPrefs()
+    moves := []
+    for h in plan.hotkeys
+        if (h.skip = "")
+            moves.Push({id: h.id, key: h.key})
+    failedKeys := moves.Length ? HotkeyRebindMany(moves).Length : 0
+    keysMoved := moves.Length - failedKeys
     if (mode = "replace") {
         Snippets := []
         for sn in plan.snippets
@@ -236,8 +298,10 @@ TransferApply(plan, mode, allowRisky := false) {
     for i, sn in Snippets
         if (SnipConflict(sn.trigger, i) != "")
             overlaps++
-    msg := "Imported: " applied " preferences, " plan.added " snippets added, " plan.changed " updated"
+    msg := "Imported: " applied " preferences, " keysMoved " hotkeys, " plan.added " snippets added, " plan.changed " updated"
         . (mode = "replace" ? ", " plan.removed " removed" : "") "."
+    if failedKeys
+        msg .= " " failedKeys " hotkeys could not be set."
     if heldBack
         msg .= " " heldBack " privacy-lowering setting skipped."
     if overlaps
@@ -290,6 +354,13 @@ TransferSummaryText(path, plan) {
         for p in plan.prefs
             s .= "  " p.label ": " (p.from = "1" ? "on" : "off") " -> "
                 . (p.to = "1" ? "on" : (p.risky ? "OFF  (lowers your privacy)" : "off")) "`n"
+    }
+    s .= "`nHOTKEYS`n"
+    if (plan.hotkeys.Length = 0) {
+        s .= "  no changes`n"
+    } else {
+        for h in plan.hotkeys
+            s .= "  " h.desc ": " h.from " -> " h.to (h.skip != "" ? "  (skipped, " h.skip ")" : "") "`n"
     }
     s .= "`nSNIPPETS  (" plan.snippets.Length " in the file)`n"
         . "  " plan.added " new, " plan.changed " changed, " plan.same " identical`n"

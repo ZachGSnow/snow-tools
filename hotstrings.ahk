@@ -36,6 +36,7 @@ SetTimer((*) => TrayTip(), -3000)
 #Include features\clipboard.ahk
 #Include features\snippets.ahk
 #Include features\settings.ahk
+#Include features\hotkeys.ahk
 #Include features\transfer.ahk
 #Include features\hud.ahk
 
