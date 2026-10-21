@@ -304,6 +304,25 @@ ClipDeleteItem(item) {
     }
 }
 
+; Delete every clip and image, pinned ones included: the journal, the image files and the
+; index are removed from disk and the in-memory state is reset. This is a normal file
+; delete, not a secure erase.
+ClipClearAll() {
+    global ClipTexts, ClipTextMap, ClipTextPins, ClipImages, ClipImgPins, ClipJournalExtra
+    global ClipTextPath, ClipImgDir, ClipImgIdxPath
+    ClipTexts := []
+    ClipTextMap := Map()
+    ClipTextPins := 0
+    ClipImages := []
+    ClipImgPins := 0
+    ClipJournalExtra := 0
+    try FileDelete(ClipTextPath)
+    try FileDelete(ClipTextPath ".tmp")
+    try FileDelete(ClipImgIdxPath)
+    try DirDelete(ClipImgDir, true)
+    DirCreate(ClipImgDir)
+}
+
 ; All clips as one newest-first list of {kind, e}, pinned first.
 ClipMergedItems() {
     global ClipTexts, ClipImages

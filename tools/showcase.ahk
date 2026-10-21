@@ -83,6 +83,14 @@ Loop Snippets.Length {
 Snap(SnipWin, "snippets")
 SnipWin.Hide()
 
+; --- settings
+SettingsToggle()
+Snap(SettingsWin, "settings")
+SettingsWin.Hide()
+SettingsWipeDialog()
+Snap(WipeWin, "delete-confirm")
+WipeWin.Hide()
+
 ; --- calculator
 CalcToggle()
 CalcInput.Value := "9:30-17:05"

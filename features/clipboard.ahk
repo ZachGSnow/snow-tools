@@ -13,18 +13,16 @@ global ClipAutoBtn := ""
 global ClipItems := []
 global ClipBusy := false
 global ClipIgnoreUntil := 0
-global ClipPrefsPath := A_ScriptDir "\data\prefs.ini"
-global ClipAutoDecimal := true
+global ClipAutoDecimal := SnowPrefBool("clips.autodecimal")
 global ClipPaused := false
 
 ClipStoreInit()
-try ClipAutoDecimal := (IniRead(ClipPrefsPath, "clips", "autodecimal", "1") = "1")
 OnClipboardChange(ClipChanged)
 
 RegHotkey("^!v", "Snow Clips: clipboard history, text + image preview", ClipToggle)
 RegHotkey("^!p", "Snow Clips: pause / resume recording", ClipTogglePause)
 RegDoc("auto", "clipboard", "START/END time blocks become decimal hours (Ctrl+T in Snow Clips)")
-RegDoc("auto", "clipboard", "copies flagged by password managers are never recorded")
+RegDoc("auto", "clipboard", "copies flagged by password managers are skipped (Settings)")
 
 ; ---------------------------------------------------------------------------
 ; Capture
@@ -33,7 +31,7 @@ ClipChanged(dataType) {
     global ClipIgnoreUntil, ClipAutoDecimal, ClipPaused
     if (A_TickCount < ClipIgnoreUntil || ClipPaused)
         return
-    if ClipIsSensitive()
+    if (SnowPrefBool("clips.skipsensitive") && ClipIsSensitive())
         return
     if (dataType = 1) {
         try {
@@ -335,11 +333,23 @@ ClipAutoLabel() {
     return "[^T START/END > hours: " (ClipAutoDecimal ? "ON " : "OFF") "]"
 }
 
+; Turn START/END conversion on or off, from the clips window or the Settings window.
+ClipSetAutoDecimal(on) {
+    try SnowPrefSet("clips.autodecimal", on ? "1" : "0")
+    ClipApplyPrefs()
+}
+
+; Re-read the preferences that clipboard.ahk keeps in live variables.
+ClipApplyPrefs() {
+    global ClipAutoDecimal, ClipAutoBtn
+    ClipAutoDecimal := SnowPrefBool("clips.autodecimal")
+    if (ClipAutoBtn != "")
+        ClipAutoBtn.Value := ClipAutoLabel()
+}
+
 ClipToggleAuto(*) {
-    global ClipAutoDecimal, ClipAutoBtn, ClipPrefsPath
-    ClipAutoDecimal := !ClipAutoDecimal
-    ClipAutoBtn.Value := ClipAutoLabel()
-    try IniWrite(ClipAutoDecimal ? "1" : "0", ClipPrefsPath, "clips", "autodecimal")
+    global ClipAutoDecimal
+    ClipSetAutoDecimal(!ClipAutoDecimal)
 }
 
 #HotIf ClipActive()

@@ -14,6 +14,7 @@
 
 ; --- shared libraries (order matters: log, theme and registry before anything that uses them)
 #Include lib\log.ahk
+#Include lib\settings.ahk
 #Include lib\theme.ahk
 #Include lib\art.ahk
 #Include lib\registry.ahk
@@ -34,6 +35,7 @@ SetTimer((*) => TrayTip(), -3000)
 #Include features\notes.ahk
 #Include features\clipboard.ahk
 #Include features\snippets.ahk
+#Include features\settings.ahk
 #Include features\hud.ahk
 
 SnowTrayInit()

@@ -252,5 +252,30 @@ StickyLoadAll() {
     }
 }
 
+; Delete the pad text, its saved position and every sticky note, open or saved. Used by
+; "Delete all data" in Settings; no confirmation here.
+NotesClearAll() {
+    global PadWin, PadEdit, PadLastSaved, PadPath, PadPosPath, StickyNotes, StickyDir
+    SetTimer(PadAutoSave, 0)
+    if (PadWin != "") {
+        PadEdit.Value := ""
+        PadLastSaved := ""
+        PadWin.Hide()
+    }
+    for id, note in StickyNotes
+        try note.win.g.Destroy()
+    StickyNotes.Clear()
+    try DirDelete(StickyDir, true)
+    try FileDelete(PadPath)
+    try FileDelete(PadPosPath)
+}
+
+; Short description of what the notes hold, for the Settings window: "pad + 2 sticky".
+NotesSummary() {
+    global PadPath, StickyNotes
+    pad := FileExist(PadPath) && FileGetSize(PadPath) > 0
+    return (pad ? "pad" : "empty pad") " + " StickyNotes.Count " sticky"
+}
+
 StickyLoadAll()
 SetTimer(StickySaveAll, 5000)

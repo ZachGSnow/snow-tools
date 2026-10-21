@@ -118,6 +118,17 @@ SnippetsSave() {
     f.Close()
 }
 
+; Replace the snippets file with the built-in defaults and apply them immediately.
+SnippetsResetToDefaults() {
+    global SnipPath, SnipSelected, SnipWin
+    try FileDelete(SnipPath)
+    SnippetsLoad()
+    SnippetsApply()
+    SnipSelected := 0
+    if (SnipWin != "")
+        SnipRefreshList(0)
+}
+
 ; ---------------------------------------------------------------------------
 ; Registration
 ; ---------------------------------------------------------------------------

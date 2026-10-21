@@ -19,6 +19,7 @@ Service desk work is a stream of small repeats: paste the same wording into anot
 | Ctrl+Alt+V | Snow Clips | Clipboard history: 10,000 text clips and 200 images, search, text and image preview, pin, delete, paste |
 | Ctrl+Alt+P | Pause | Stops and resumes clipboard recording |
 | Alt+S | Snippets | Add, edit and delete text expansions in an editor; changes apply immediately, no reload |
+| Ctrl+Alt+S | Settings | Clipboard options (password guard, time-block conversion, pause) and the buttons that delete your data |
 | Win+N | Snow Pad | One scratch note that autosaves every 5 seconds; Ctrl+F finds |
 | Alt+N | Sticky notes | As many small notes as you like, each remembering its place and size |
 | Alt+C | Snow Calc | `1100-1115` gives 0.25 hours, `9:30-17:05` gives 7.58, and plain arithmetic works too |
@@ -53,16 +54,19 @@ Everything stays on your machine. The code has no network access at all. Runtime
 
 A clipboard history is sensitive by nature, so:
 
-- **Password managers are respected.** A copy flagged with `ExcludeClipboardContentFromMonitorProcessing` (the flag KeePass, Bitwarden, 1Password and others set) or `CanIncludeInClipboardHistory = 0` is never recorded. If the flag is present but cannot be read, the copy is skipped.
+- **Password managers are respected, by default.** A copy flagged with `ExcludeClipboardContentFromMonitorProcessing` (the flag KeePass, Bitwarden, 1Password and others set) or `CanIncludeInClipboardHistory = 0` is not recorded. If the flag is present but cannot be read, the copy is skipped. This is a setting (Ctrl+Alt+S) that is on out of the box; turning it off asks you to confirm and the window then says so in red.
 - **Pause with Ctrl+Alt+P** before copying anything you do not want kept. It is not remembered across restarts: every start records again.
-- Nothing is encrypted. Anyone who can read your profile folder can read the history. Delete `data\clips.log` and `data\img\` to wipe it, or delete a single clip with Delete in the clips window.
+- **Delete from Settings (Ctrl+Alt+S).** *Clear clipboard history* removes every clip and image, pinned included, after a Yes/No confirmation that shows the counts. *Delete all data* also removes the pad, sticky notes and the error log, and only proceeds once you type `DELETE`. Snippets and preferences are kept; *Reset settings* returns those to the defaults. A single clip is deleted with Delete in the clips window.
+- Nothing is encrypted, and deleting is an ordinary file delete, not a secure erase: on an SSD the old data may linger until the drive overwrites it. Anyone who can read your profile folder can read the history.
+
+![The delete-all confirmation](docs/delete-confirm.png)
 
 ## Configuration
 
 | Setting | Where |
 |---|---|
 | Snippets | Alt+S, or edit `data\snippets.txt` and choose Reload from the tray menu |
-| START/END to hours | Ctrl+T in the clips window (saved in `data\prefs.ini`) |
+| Password-manager guard, START/END to hours, pause | Ctrl+Alt+S (also in the HUD and the tray menu). Preferences are saved in `data\prefs.ini`; Ctrl+T in the clips window also toggles START/END |
 | Clip limits | `CLIP_MAX_TEXT`, `CLIP_MAX_IMG`, `CLIP_MAX_CHARS` at the top of `lib\clipstore.ahk` |
 | Colors and font | The `THEME_*` constants at the top of `lib\theme.ahk` |
 
@@ -74,6 +78,8 @@ The defaults the first run seeds (`zem`, `zph`, `:ty`, `cdate`, `tdate`, `ctime`
 
 ![Snippets editor](docs/snippets.png)
 
+![Settings window](docs/settings.png)
+
 ## Testing
 
 ```powershell
@@ -81,7 +87,7 @@ pwsh -File tests\run-tests.ps1                 # syntax check + self-test (about
 pwsh -File tests\run-tests.ps1 -Showcase       # regenerate the screenshots in docs\
 ```
 
-The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard (a flagged copy is not recorded, pause works), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
+The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard and its setting (a flagged copy is skipped, recorded when the guard is off, pause works), the settings and delete actions (both confirmations are answered for real: declining keeps the data, and the wrong word deletes nothing), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
 
 Verified: Windows 11 with AutoHotkey 2.0.28. Not verified: Windows 10, mixed-DPI multi-monitor setups, and non-US keyboard layouts (hotstrings and `Send` can behave differently there).
 

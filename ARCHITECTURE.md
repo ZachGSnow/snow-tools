@@ -8,6 +8,7 @@ Snow Tools is a set of independent tools sharing a small library. Nothing is com
 hotstrings.ahk      entry point: includes, tray identity, nothing else
 lib/                shared code, included in dependency order
   log.ahk           SnowLog, global error handler, SnowDataDir
+  settings.ahk      preferences in data\prefs.ini (named, defaulted, cached)
   theme.ahk         colors, glyph constants, SnowWin (the character-grid window)
   art.ahk           banner art (ASCII source, expanded to glyphs at load)
   registry.ahk      RegHotkey / RegDoc: the list the HUD reads
@@ -36,6 +37,12 @@ Glyphs are not in the source. `lib/theme.ahk` builds them with `Chr()`, and `lib
 `lib/clipstore.ahk` is deliberately separate from the window. Text clips are an append-only journal, `data\clips.log`, with length-prefixed records (`@<length>|<timestamp>|<pinned>` then the text), so a clip may contain anything, including text that looks like a record header. A later record for the same text supersedes an earlier one; delete and pin rewrite the file, as does a journal with many superseded records. Images are PNGs in `data\img\` with a small index including a CRC32, which is how a repeated image is bumped instead of stored twice. Both stores are capped, oldest unpinned first; pinned entries do not count toward the cap.
 
 Capture is `OnClipboardChange` in `features/clipboard.ahk`. Before anything is read, `ClipIsSensitive` checks the registered clipboard formats `ExcludeClipboardContentFromMonitorProcessing` and `CanIncludeInClipboardHistory`, and the pause flag is checked. Changes the app makes itself (paste, setting converted hours) set `ClipIgnoreUntil` so they are not recorded again.
+
+## Settings and deleting data
+
+`lib/settings.ahk` keeps preferences in `data\prefs.ini`. Each one is named `section.key` and must have an entry in `SnowPrefDefaults`; reading or writing an unknown name throws, so a typo cannot silently read nothing. Values are cached and `SnowPrefSet` updates cache and file together. Code that keeps a preference in a live variable (the START/END conversion) re-reads it through an `Apply` function, which is also how Reset applies defaults without a reload. The password guard is read on every clipboard change through the cache, so flipping it in the Settings window takes effect immediately.
+
+`features/settings.ahk` is the window. Checkbox rows are clickable text (`[x]` / `[ ]`) with a getter and a setter, and `SettingsRefresh` redraws them all from the getters, so the window cannot disagree with the real state. The delete actions live next to the data they remove: `ClipClearAll` in the clip store, `NotesClearAll` in the notes feature, and `SnippetsResetToDefaults` in snippets. The window only orchestrates them and asks for confirmation. Clearing history uses a Yes/No box that defaults to No; deleting everything opens a dialog that proceeds only when the text is exactly `DELETE`. Both are plain file deletes, not secure erases. The self-test answers the real dialogs by clicking their buttons, so it covers both the decline and the accept paths.
 
 ## Snippets
 
