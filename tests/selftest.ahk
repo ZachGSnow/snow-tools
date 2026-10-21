@@ -860,6 +860,12 @@ GroupHotkeyReset() {
     Check("reset settings also restores the hotkeys", HotkeyText("note") = "Alt+N" && IniRead(SnowPrefsPath, "hotkeys", "note", "") = "")
 }
 
+Group("version", GroupVersion)
+GroupVersion() {
+    Check("the version is a plain major.minor.patch", RegExMatch(SNOW_VERSION, "^\d+\.\d+\.\d+$"), SNOW_VERSION)
+    Check("the banner shows it", InStr(ART_SUBTITLE, "v" SNOW_VERSION), ART_SUBTITLE)
+}
+
 ; --------------------------------------------------------------------------
 if (TestSavedClip != "")
     try A_Clipboard := TestSavedClip

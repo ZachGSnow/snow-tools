@@ -3,7 +3,7 @@
 ;  \__ \ ' \/ _ \ V  V /   | | / _ \/ _ \| |(_-<
 ;  |___/_||_\___/\_/\_/    |_| \___/\___/|_/__/
 ;
-;  Snow Tools v3.0
+;  Snow Tools
 ;  by Zach Snow
 ;
 ;  Entry point. Everything lives in lib\ (shared code) and features\ (one file per tool);
@@ -11,6 +11,9 @@
 
 #Requires AutoHotkey v2.0
 #SingleInstance Force
+
+; The release version, shown in the banner and the tray tip. Keep it equal to the git tag.
+global SNOW_VERSION := "1.0.0"
 
 ; --- shared libraries (order matters: log, theme and registry before anything that uses them)
 #Include lib\log.ahk
@@ -25,7 +28,7 @@
 #Include lib\tray.ahk
 
 ; --- tray identity
-A_IconTip := "*  Snow Tools  *  " GL_DOT "  by Zach Snow"
+A_IconTip := "*  Snow Tools " SNOW_VERSION "  *  " GL_DOT "  by Zach Snow"
 TrayTip("Snow Tools loaded", "*  Snow Tools  *", 1)
 SetTimer((*) => TrayTip(), -3000)
 
