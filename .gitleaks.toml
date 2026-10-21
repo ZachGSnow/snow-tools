@@ -1,0 +1,11 @@
+# Secret scanning config. Everything is scanned with gitleaks' default rules, except the
+# runtime data folder: it is git-ignored and never committed, and it holds the user's own
+# copied text (clipboard history, notes), which can contain anything. Without this, a scan
+# of a working folder that is also used as the live install flags that private data.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "git-ignored runtime data"
+# Matches relative and absolute paths; only the files the app itself writes into data/.
+paths = ['''(^|[\\/])data[\\/](clips\.log|images\.idx|snippets\.txt|prefs\.ini|snowtools\.log|quicknotes[^\\/]*|(img|stickies|backup)[\\/].*)$''']
