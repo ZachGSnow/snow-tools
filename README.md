@@ -1,0 +1,90 @@
+# Snow Tools
+
+**A keyboard-driven toolkit for Windows service desk work: clipboard history, text snippets, scratch notes and a call-time calculator, in under 3,000 lines of AutoHotkey v2.**
+
+[![CI](https://github.com/ZachGSnow/snow-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/ZachGSnow/snow-tools/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+![Snow Tools HUD listing every hotkey and hotstring](docs/hud.png)
+
+## Why
+
+Service desk work is a stream of small repeats: paste the same wording into another ticket, find the thing you copied an hour ago, work out how long a call ran for billing. Each one costs a few seconds and a bit of focus. Snow Tools removes those costs with a handful of small tools that live in the tray, store everything in plain local files, and describe themselves: press **Alt+Y** and the overlay lists every hotkey and hotstring, generated from the code, so the list cannot drift out of date.
+
+## Features
+
+| Key | Tool | What it does |
+|---|---|---|
+| Alt+Y | HUD | Every hotkey, hotstring and automatic behavior, plus shortcuts to snippets, the error log and the data folder |
+| Ctrl+Alt+V | Snow Clips | Clipboard history: 10,000 text clips and 200 images, search, text and image preview, pin, delete, paste |
+| Ctrl+Alt+P | Pause | Stops and resumes clipboard recording |
+| Alt+S | Snippets | Add, edit and delete text expansions in an editor; changes apply immediately, no reload |
+| Win+N | Snow Pad | One scratch note that autosaves every 5 seconds; Ctrl+F finds |
+| Alt+N | Sticky notes | As many small notes as you like, each remembering its place and size |
+| Alt+C | Snow Calc | `1100-1115` gives 0.25 hours, `9:30-17:05` gives 7.58, and plain arithmetic works too |
+
+Details worth knowing:
+
+- **Time blocks become hours.** Copy a line such as `START: 0905 | END: 0950` and Snow Clips puts `0.75` on the clipboard (toggle with Ctrl+T in the clips window). The `callnote` snippet types a template with that line already in it.
+- **Snippets are plain text.** `data\snippets.txt` holds one `trigger = text` per line. Tokens `{date}`, `{tomorrow}`, `{time}` and `{cursor}` are filled in as you type. The editor warns when one trigger is the start of another, since the longer one could then never fire.
+- **Windows are drawn on a character grid.** Every window uses the same monospace frame, which gives the whole toolkit its keygen-era look and keeps the code for each tool small.
+
+![Snow Clips with a call note selected](docs/clips.png)
+
+## Quick start
+
+1. Install [AutoHotkey v2](https://www.autohotkey.com/) (v2.0 or later; tested on 2.0.28 on Windows 11).
+2. Download or clone this repository.
+3. Double-click `hotstrings.ahk` (it is the entry point; the name is kept so older startup shortcuts keep working).
+4. Press **Alt+Y**. To start it at login, right-click the tray icon and tick **Run at startup**.
+
+## Your data and privacy
+
+Everything stays on your machine. The code has no network access at all. Runtime data is created next to the script in `data\` (git-ignored):
+
+| File | Contents |
+|---|---|
+| `clips.log` | Text clips, **as plain text** |
+| `img\`, `images.idx` | Clipboard images as PNG files, and their index |
+| `snippets.txt` | Your snippets |
+| `quicknotes.txt`, `stickies` | Snow Pad and sticky notes |
+| `prefs.ini` | Small preferences |
+| `snowtools.log` | Errors only, capped near 1 MB |
+
+A clipboard history is sensitive by nature, so:
+
+- **Password managers are respected.** A copy flagged with `ExcludeClipboardContentFromMonitorProcessing` (the flag KeePass, Bitwarden, 1Password and others set) or `CanIncludeInClipboardHistory = 0` is never recorded. If the flag is present but cannot be read, the copy is skipped.
+- **Pause with Ctrl+Alt+P** before copying anything you do not want kept. It is not remembered across restarts: every start records again.
+- Nothing is encrypted. Anyone who can read your profile folder can read the history. Delete `data\clips.log` and `data\img\` to wipe it, or delete a single clip with Delete in the clips window.
+
+## Configuration
+
+| Setting | Where |
+|---|---|
+| Snippets | Alt+S, or edit `data\snippets.txt` and choose Reload from the tray menu |
+| START/END to hours | Ctrl+T in the clips window (saved in `data\prefs.ini`) |
+| Clip limits | `CLIP_MAX_TEXT`, `CLIP_MAX_IMG`, `CLIP_MAX_CHARS` at the top of `lib\clipstore.ahk` |
+| Colors and font | The `THEME_*` constants at the top of `lib\theme.ahk` |
+
+The defaults the first run seeds (`zem`, `zph`, `:ty`, `cdate`, `tdate`, `ctime`, `callnote`) use placeholder values such as `you@example.com`; replace them with your own.
+
+## How it works
+
+`hotstrings.ahk` only lists includes. Shared code is in `lib\`, one tool per file in `features\`. Each tool registers its hotkeys through a single registry that the HUD reads, windows are built on a shared character-grid class, and the clipboard store is an append-only journal with caps. [ARCHITECTURE.md](ARCHITECTURE.md) covers the design and how to add a tool.
+
+![Snippets editor](docs/snippets.png)
+
+## Testing
+
+```powershell
+pwsh -File tests\run-tests.ps1                 # syntax check + self-test (about 40 s)
+pwsh -File tests\run-tests.ps1 -Showcase       # regenerate the screenshots in docs\
+```
+
+The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard (a flagged copy is not recorded, pause works), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
+
+Verified: Windows 11 with AutoHotkey 2.0.28. Not verified: Windows 10, mixed-DPI multi-monitor setups, and non-US keyboard layouts (hotstrings and `Send` can behave differently there).
+
+## License
+
+[MIT](LICENSE) &copy; Zach Snow

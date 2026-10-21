@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install AutoHotkey v2 (portable)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://www.autohotkey.com/download/ahk-v2.zip -OutFile "$env:RUNNER_TEMP\ahk.zip"
+          Expand-Archive "$env:RUNNER_TEMP\ahk.zip" -DestinationPath "$env:RUNNER_TEMP\ahk"
+          "AHK_EXE=$env:RUNNER_TEMP\ahk\AutoHotkey64.exe" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Syntax check and self-test
+        shell: pwsh
+        run: ./tests/run-tests.ps1
+
+  # Single stable check name for branch protection; fails unless the test job passed.
+  ci:
+    name: ci
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tests passed
+        run: test "${{ needs.test.result }}" = "success"

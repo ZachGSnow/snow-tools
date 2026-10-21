@@ -1,0 +1,13 @@
+# Runtime data: clipboard history, images, snippets, notes, logs (created next to hotstrings.ahk)
+data/
+
+# Test output
+tests/shots/
+results.txt
+showcase-error.txt
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
