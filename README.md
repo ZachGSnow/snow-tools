@@ -1,6 +1,6 @@
 # Snow Tools
 
-**A keyboard-driven toolkit for Windows service desk work: clipboard history, text snippets, scratch notes and a call-time calculator, in under 3,000 lines of AutoHotkey v2.**
+**A keyboard-driven toolkit for Windows service desk work: clipboard history, text snippets, scratch notes and a call-time calculator, with rebindable hotkeys and settings you can export, in about 3,500 lines of AutoHotkey v2 and 1,300 lines of tests.**
 
 [![CI](https://github.com/ZachGSnow/snow-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/ZachGSnow/snow-tools/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -41,6 +41,8 @@ Details worth knowing:
 3. Double-click `hotstrings.ahk` (it is the entry point; the name is kept so older startup shortcuts keep working).
 4. Press **Alt+Y**. To start it at login, right-click the tray icon and tick **Run at startup**.
 
+The version is shown in the HUD banner and the tray tip; see [Releases](https://github.com/ZachGSnow/snow-tools/releases) for what each one contains.
+
 ## Your data and privacy
 
 Everything stays on your machine. The code has no network access at all. Runtime data is created next to the script in `data\` (git-ignored):
@@ -51,12 +53,14 @@ Everything stays on your machine. The code has no network access at all. Runtime
 | `img\`, `images.idx` | Clipboard images as PNG files, and their index |
 | `snippets.txt` | Your snippets |
 | `quicknotes.txt`, `stickies` | Snow Pad and sticky notes |
-| `prefs.ini` | Small preferences |
+| `prefs.ini` | Preferences, and any hotkeys you changed |
+| `backup\` | Copies of your settings made before an import (the newest 10) |
 | `snowtools.log` | Errors only, capped near 1 MB |
 
 A clipboard history is sensitive by nature, so:
 
 - **Password managers are respected, by default.** A copy flagged with `ExcludeClipboardContentFromMonitorProcessing` (the flag KeePass, Bitwarden, 1Password and others set) or `CanIncludeInClipboardHistory = 0` is not recorded. If the flag is present but cannot be read, the copy is skipped. This is a setting (Ctrl+Alt+S) that is on out of the box; turning it off asks you to confirm and the window then says so in red.
+- **The guard only sees what programs flag.** A command line with a token in it (a `curl` call with an Authorization header, say), or a password you copied out of a document, looks like any other text and is recorded. If you copy secrets like that, pause first or delete the clip afterwards: search the clips window for part of it and press Delete.
 - **Pause with Ctrl+Alt+P** before copying anything you do not want kept. It is not remembered across restarts: every start records again.
 - **Delete from Settings (Ctrl+Alt+S).** *Clear clipboard history* removes every clip and image, pinned included, after a Yes/No confirmation that shows the counts. *Delete all data* also removes the pad, sticky notes and the error log, and only proceeds once you type `DELETE`. Snippets and preferences are kept; *Reset settings* returns those to the defaults. A single clip is deleted with Delete in the clips window.
 - Nothing is encrypted, and deleting is an ordinary file delete, not a secure erase: on an SSD the old data may linger until the drive overwrites it. Anyone who can read your profile folder can read the history.
@@ -100,7 +104,7 @@ The defaults the first run seeds (`zem`, `zph`, `:ty`, `cdate`, `tdate`, `ctime`
 
 ## How it works
 
-`hotstrings.ahk` only lists includes. Shared code is in `lib\`, one tool per file in `features\`. Each tool registers its hotkeys through a single registry that the HUD reads, windows are built on a shared character-grid class, and the clipboard store is an append-only journal with caps. [ARCHITECTURE.md](ARCHITECTURE.md) covers the design and how to add a tool.
+`hotstrings.ahk` only lists includes. Shared code is in `lib\`, one tool per file in `features\`. Each tool registers its hotkeys through a single registry that the HUD reads, windows are built on a shared character-grid class, the clipboard store is an append-only journal with caps, and preferences and changed hotkeys live in one small settings file that export and import read and write. [ARCHITECTURE.md](ARCHITECTURE.md) covers the design and how to add a tool.
 
 ![Snippets editor](docs/snippets.png)
 
@@ -116,6 +120,8 @@ pwsh -File tests\test-live-guard.ps1           # check the running-instance guar
 ```
 
 **If you use Snow Tools from the folder you develop in:** the tests send real key presses and use the real clipboard, so a running Snow Tools would react to them and record the test clips in your real history. The runner therefore refuses to start while one is running and tells you so. Exit it from its tray menu, or pass `-StopLive`: it exits the running app cleanly, runs, and starts it again from the same script afterwards, even when the run fails. `tests\test-live-guard.ps1` checks that behavior with a stand-in script, never your real app, and runs in CI. Settings exports (`snowtools-settings*.txt`) are git-ignored for the same reason: they hold your private snippets.
+
+Your runtime data in `data\` is never committed: it is git-ignored, CI fails if any file under it is tracked, and `.gitleaks.toml` only allows the files the app itself writes there, so a secret scan of a working folder you also run from does not flag your own clipboard history. The history scan still covers every commit.
 
 The self-test copies the project to a temp folder, so your clips, snippets, notes and Startup folder are never touched. It opens real windows, types into a scratch window and briefly uses the clipboard (restored afterwards), so leave the machine alone while it runs. It covers the clipboard store (dedupe, pinning, caps, journal round-trip), the privacy guard and its setting (a flagged copy is skipped, recorded when the guard is off, pause works), the settings and delete actions (both confirmations are answered for real: declining keeps the data, and the wrong word deletes nothing), hotkey rebinding (the rules, real key presses firing a rebound hotkey and not the old one, key capture, swaps, saved choices at start, reset), settings export and import (strict parsing, the summary dialog, merge and replace, the backup, and the privacy opt-in), the snippet engine and editor, the calculator, notes, window placement, logging, and a 10,000-clip performance check.
 
