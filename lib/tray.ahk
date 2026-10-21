@@ -7,6 +7,7 @@ SnowTrayInit() {
     A_TrayMenu.Delete()
     A_TrayMenu.Add("Show HUD (Alt+Y)", (*) => HudToggle())
     A_TrayMenu.Add("Snippets... (Alt+S)", (*) => SnippetsToggle())
+    A_TrayMenu.Add("Settings... (Ctrl+Alt+S)", (*) => SettingsToggle())
     A_TrayMenu.Add()
     A_TrayMenu.Add("Open data folder", (*) => SnowOpenDataFolder())
     A_TrayMenu.Add("Open error log", (*) => SnowOpenLog())

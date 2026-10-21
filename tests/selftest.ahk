@@ -375,6 +375,137 @@ GroupPerf() {
     ClipUI.Hide()
 }
 
+; Answers the next Snow Tools MsgBox by clicking a button: "Button1" = Yes, "Button2" = No.
+TestAnswer(button) {
+    SetTimer(TestAnswerNow.Bind(button), -150)
+}
+TestAnswerNow(button) {
+    title := "*  Snow Tools  * ahk_class #32770"
+    if WinWait(title, , 5)
+        ControlClick(button, title)
+}
+
+Group("settings: preferences", GroupPrefs)
+GroupPrefs() {
+    Check("skip-sensitive defaults to on", SnowPrefGet("clips.skipsensitive") = "1")
+    SnowPrefSet("clips.autodecimal", "0")
+    Check("a preference is written to prefs.ini", IniRead(SnowPrefsPath, "clips", "autodecimal", "?") = "0")
+    SnowPrefSet("clips.autodecimal", "1")
+    threw := false
+    try SnowPrefSet("clips.nosuchthing", "1")
+    catch
+        threw := true
+    Check("an unknown preference name is rejected", threw)
+}
+
+Group("settings: password guard toggle", GroupGuardToggle)
+GroupGuardToggle() {
+    SettingsToggle()
+    Check("settings window opens with the guard shown as on", SettingsWin.IsVisible() && InStr(SettingsChecks[1].ctrl.Value, "[x]") = 1)
+    Snap(SettingsWin, "settings")
+    TestAnswer("Button2")
+    SettingsSetSensitive(false)
+    Check("declining the warning keeps the guard on", SnowPrefGet("clips.skipsensitive") = "1")
+    TestAnswer("Button1")
+    SettingsSetSensitive(false)
+    SettingsRefresh()
+    Check("accepting the warning turns the guard off", SnowPrefGet("clips.skipsensitive") = "0"
+        && InStr(SettingsChecks[1].ctrl.Value, "[ ]") = 1 && InStr(SettingsSensNote.Value, "OFF") = 1)
+    TestSetFlaggedClip("secret-guard-off-123", "exclude")
+    Check("with the guard off a flagged copy is recorded", ClipTextMap.Has("secret-guard-off-123"))
+    SettingsSetSensitive(true)
+    SettingsRefresh()
+    TestSetFlaggedClip("secret-guard-on-456", "exclude")
+    Check("turning the guard back on needs no confirmation and skips flagged copies"
+        , SnowPrefGet("clips.skipsensitive") = "1" && !ClipTextMap.Has("secret-guard-on-456"))
+    SettingsWin.Hide()
+}
+
+Group("settings: clear clipboard history", GroupClearHistory)
+GroupClearHistory() {
+    p := ClipAddText("pinned before clear")
+    ClipTogglePin({kind: "txt", e: p})
+    AddTestImage(205)
+    Check("the store has something to clear", ClipTexts.Length > 0 && ClipImages.Length > 0)
+    TestAnswer("Button2")
+    SettingsClearHistory()
+    Check("declining keeps the history", ClipTexts.Length > 0 && ClipImages.Length > 0 && FileExist(ClipTextPath))
+    TestAnswer("Button1")
+    SettingsClearHistory()
+    imgs := 0
+    Loop Files ClipImgDir "\*.*"
+        imgs++
+    Check("accepting deletes every clip, pinned too", ClipTexts.Length = 0 && ClipTextMap.Count = 0 && ClipTextPins = 0)
+    Check("accepting deletes every image file and the index", ClipImages.Length = 0 && ClipImgPins = 0 && imgs = 0 && !FileExist(ClipImgIdxPath))
+    Check("the journal file is gone", !FileExist(ClipTextPath))
+    ClipLoadTexts()
+    ClipLoadImages()
+    Check("nothing comes back when the store is reloaded from disk", ClipTexts.Length = 0 && ClipImages.Length = 0)
+    ClipToggle()
+    Check("the open clips list is empty afterwards", ClipItems.Length = 0)
+    ClipUI.Hide()
+    e := ClipAddText("recorded after clear")
+    ClipLoadTexts()
+    Check("the store works again after a clear", e != "" && ClipTexts.Length = 1 && ClipTextMap.Has("recorded after clear"))
+}
+
+Group("settings: delete all data", GroupDeleteAll)
+GroupDeleteAll() {
+    Check("only DELETE is accepted", SettingsWipeTypedOk("DELETE") && SettingsWipeTypedOk(" DELETE ")
+        && !SettingsWipeTypedOk("delete") && !SettingsWipeTypedOk("DELET") && !SettingsWipeTypedOk("DELETE ALL") && !SettingsWipeTypedOk(""))
+    PadToggle()
+    PadEdit.Value := "pad secret text"
+    PadSave(true)
+    PadClose()
+    StickyCreate(902, 300, 300, "sticky secret text")
+    StickySaveAll()
+    SnowLog("wipe test marker")
+    ClipAddText("clip before wipe")
+    stickyFiles := 0
+    Loop Files StickyDir "*.txt"
+        stickyFiles++
+    Check("data exists before the wipe", FileExist(PadPath) && stickyFiles = 1 && FileExist(SnowLogPath) && ClipTexts.Length > 0, stickyFiles)
+
+    SettingsDeleteAll()
+    Check("the confirmation window opens and deletes nothing yet", WipeWin.IsVisible() && FileExist(PadPath) && ClipTexts.Length > 0)
+    Snap(WipeWin, "wipe")
+    WipeEdit.Value := "delete"
+    SettingsWipeAccept()
+    Check("wrong text deletes nothing and says so", WipeWin.IsVisible() && FileExist(PadPath) && ClipTexts.Length > 0 && WipeMsg.Value != "")
+    WipeEdit.Value := "DELETE"
+    SettingsWipeAccept()
+    stickyFiles := 0
+    Loop Files StickyDir "*.txt"
+        stickyFiles++
+    Check("typing DELETE closes the window", !WipeWin.IsVisible())
+    Check("clips and images are gone", ClipTexts.Length = 0 && ClipImages.Length = 0 && !FileExist(ClipTextPath))
+    Check("pad and sticky notes are gone", !FileExist(PadPath) && !FileExist(PadPosPath) && stickyFiles = 0 && StickyNotes.Count = 0)
+    Check("the error log is gone", !FileExist(SnowLogPath))
+    Check("snippets and preferences are kept", FileExist(SnipPath) && Snippets.Length > 0 && SnowPrefGet("clips.skipsensitive") = "1")
+    PadToggle()
+    Check("the pad reopens empty", PadEdit.Value = "")
+    PadClose()
+}
+
+Group("settings: reset", GroupReset)
+GroupReset() {
+    ClipSetAutoDecimal(false)
+    Snippets.Push({trigger: "zzreset", text: "x"})
+    SnippetsSave()
+    SnippetsApply()
+    TestAnswer("Button2")
+    SettingsReset()
+    Check("declining keeps the changes", !ClipAutoDecimal && Snippets.Length = 8)
+    TestAnswer("Button1")
+    SettingsReset()
+    Check("preferences return to the defaults", ClipAutoDecimal && SnowPrefGet("clips.autodecimal") = "1" && !FileExist(SnowPrefsPath))
+    Check("snippets return to the built-in set", Snippets.Length = 7 && !InStr(FileRead(SnipPath, "UTF-8"), "zzreset"))
+    SendLevel(1)
+    TypeBegin()
+    Check("a removed snippet stops expanding and a default still works", TypeIn("zzreset") = "zzreset" && TypeIn("zem") = "you@example.com")
+    TypeEnd()
+}
+
 ; --------------------------------------------------------------------------
 if (TestSavedClip != "")
     try A_Clipboard := TestSavedClip

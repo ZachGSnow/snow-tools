@@ -82,6 +82,7 @@ HudBuild() {
     w.Btn(21, rows - 3, "[error log]", HudAction.Bind(SnowOpenLog))
     w.Btn(34, rows - 3, "[data folder]", HudAction.Bind(SnowOpenDataFolder))
     w.Btn(49, rows - 3, "[reload script]", HudAction.Bind((*) => Reload()))
+    w.Btn(67, rows - 3, "[settings  Ctrl+Alt+S]", HudAction.Bind(SettingsToggle))
     HudStatus := w.Add("Text", 2, rows - 2, cols - 4, 1, "-Wrap 0x80 c" THEME_FG_DIM, "")
     w.SetStatus("esc or alt+y closes")
 }
