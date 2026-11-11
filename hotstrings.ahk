@@ -13,7 +13,7 @@
 #SingleInstance Force
 
 ; The release version, shown in the banner and the tray tip. Keep it equal to the git tag.
-global SNOW_VERSION := "1.0.0"
+global SNOW_VERSION := "1.0.1"
 
 ; --- shared libraries (order matters: log, theme and registry before anything that uses them)
 #Include lib\log.ahk
