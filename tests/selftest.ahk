@@ -54,6 +54,79 @@ AddTestImage(width) {
     return ClipAddImageFromClipboard()
 }
 
+; Sum of R+G+B over a 24-bit pixel buffer (rows `stride` bytes apart).
+RgbSum(base, stride, w, h) {
+    sum := 0
+    Loop h {
+        row := base + (A_Index - 1) * stride
+        Loop w {
+            q := row + (A_Index - 1) * 3
+            sum += NumGet(q, 0, "UChar") + NumGet(q, 1, "UChar") + NumGet(q, 2, "UChar")
+        }
+    }
+    return sum
+}
+
+; Pasting happens in another program, so read the clipboard from a separate process: the
+; old code put a DIB section there whose pixels other processes could not read.
+CheckImagePasteCrossProcess(png) {
+    pBmp := 0
+    DllCall("gdiplus\GdipCreateBitmapFromFile", "WStr", png, "Ptr*", &pBmp)
+    w := 0
+    h := 0
+    DllCall("gdiplus\GdipGetImageWidth", "Ptr", pBmp, "UInt*", &w)
+    DllCall("gdiplus\GdipGetImageHeight", "Ptr", pBmp, "UInt*", &h)
+    rect := Buffer(16, 0)
+    NumPut("Int", w, rect, 8)
+    NumPut("Int", h, rect, 12)
+    bd := Buffer(32, 0)
+    DllCall("gdiplus\GdipBitmapLockBits", "Ptr", pBmp, "Ptr", rect, "UInt", 1, "Int", 0x21808, "Ptr", bd)
+    want := RgbSum(NumGet(bd, 16, "Ptr"), NumGet(bd, 8, "Int"), w, h)
+    DllCall("gdiplus\GdipBitmapUnlockBits", "Ptr", pBmp, "Ptr", bd)
+    DllCall("gdiplus\GdipDisposeImage", "Ptr", pBmp)
+
+    reader := TestShots "\clipreader.ahk"
+    out := TestShots "\clipreader.txt"
+    try FileDelete(reader)
+    try FileDelete(out)
+    FileAppend('
+    (
+#Requires AutoHotkey v2.0
+#NoTrayIcon
+res := "no clipboard"
+Loop 20 {
+    if DllCall("OpenClipboard", "Ptr", A_ScriptHwnd) {
+        res := "no CF_DIB"
+        if (hd := DllCall("GetClipboardData", "UInt", 8, "Ptr")) {
+            p := DllCall("GlobalLock", "Ptr", hd, "Ptr")
+            w := NumGet(p, 4, "Int"), h := NumGet(p, 8, "Int"), bpp := NumGet(p, 14, "UShort")
+            stride := (w * bpp // 8 + 3) & ~3
+            sum := 0
+            Loop Abs(h) {
+                row := p + 40 + (A_Index - 1) * stride
+                Loop w {
+                    q := row + (A_Index - 1) * (bpp // 8)
+                    sum += NumGet(q, 0, "UChar") + NumGet(q, 1, "UChar") + NumGet(q, 2, "UChar")
+                }
+            }
+            DllCall("GlobalUnlock", "Ptr", hd)
+            hp := DllCall("GetClipboardData", "UInt", DllCall("RegisterClipboardFormat", "Str", "PNG", "UInt"), "Ptr")
+            res := w "x" Abs(h) " bpp=" bpp " sum=" sum " png=" (hp ? DllCall("GlobalSize", "Ptr", hp, "UPtr") : 0)
+        }
+        DllCall("CloseClipboard")
+        break
+    }
+    Sleep(50)
+}
+FileAppend(res, A_Args[1], "UTF-8")
+    )', reader, "UTF-8")
+
+    ok := GdipPngToClipboard(png)
+    try RunWait('"' A_AhkPath '" "' reader '" "' out '"')
+    got := FileExist(out) ? FileRead(out, "UTF-8") : "reader produced nothing"
+    Check("pasted image is readable by another program (CF_DIB + PNG)", ok && got = w "x" h " bpp=24 sum=" want " png=" FileGetSize(png), got)
+}
+
 ; Types into a scratch window at send level 1 so the script's own hotstrings react.
 global TypeGui := ""
 global TypeEdit := ""
@@ -89,6 +162,7 @@ GroupStore() {
     n := ClipImages.Length
     ClipAddImageFromClipboard()    ; same image again -> bump, not a new entry
     Check("duplicate image is bumped, not duplicated", ClipImages.Length = n)
+    CheckImagePasteCrossProcess(TestShots "\img202.png")
 
     tricky := "x`n@3|20260101000000|1`nabc`nCRLF line`r`nend"
     ClipAddText("hello world")
